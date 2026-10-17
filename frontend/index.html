@@ -65,8 +65,17 @@
 
     // --- CONFIG & TYPES ---
     const urlParams = new URLSearchParams(window.location.search);
+    const paramApi = urlParams.get("api");
+    if (paramApi) {
+      try { localStorage.setItem("debug_dojo_api_base", paramApi); } catch (_) {}
+    }
+    const savedApi = (() => {
+      try { return localStorage.getItem("debug_dojo_api_base"); } catch (_) { return null; }
+    })();
+    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const defaultApi = isLocal ? "http://localhost:8000" : "";
     const CONFIG = {
-      API_BASE: "http://localhost:8000",
+      API_BASE: (paramApi || savedApi || window.__DEBUG_DOJO_API_BASE__ || defaultApi).replace(/\/$/, ""),
       USE_MOCK: urlParams.get("mock") === "1"
     };
 
@@ -2042,6 +2051,17 @@
     // <LoadError>: shown when a learner endpoint fails (protected profile, network down, server error)
     function LoadError({ error, onNavigate, onRetry }) {
       const authIssue = error && (error.status === 401 || error.status === 403);
+      const handleSetApi = () => {
+        const current = CONFIG.API_BASE || "";
+        const entered = window.prompt("Enter your Debug Dojo backend API URL (e.g. https://your-backend.railway.app):", current);
+        if (entered !== null) {
+          try {
+            localStorage.setItem("debug_dojo_api_base", entered.trim().replace(/\/$/, ""));
+            window.location.reload();
+          } catch (e) {}
+        }
+      };
+
       return (
         <PaperCard accent className="text-center space-y-4 max-w-xl mx-auto" pad="p-8">
           <Seal char={authIssue ? "鍵" : "障"} size="lg" />
@@ -2052,6 +2072,20 @@
           <div className="flex flex-wrap gap-3 justify-center">
             {authIssue && <InkButton variant="primary" onClick={() => onNavigate("/welcome")}>Sign in</InkButton>}
             {onRetry && <InkButton variant="secondary" onClick={onRetry}>Try again</InkButton>}
+            {!authIssue && (
+              <>
+                <InkButton variant="primary" onClick={() => {
+                  const url = new URL(window.location);
+                  url.searchParams.set("mock", "1");
+                  window.location.href = url.toString();
+                }}>
+                  Try Demo / Mock Mode
+                </InkButton>
+                <InkButton variant="secondary" onClick={handleSetApi}>
+                  Set Backend URL
+                </InkButton>
+              </>
+            )}
           </div>
         </PaperCard>
       );
@@ -2200,6 +2234,11 @@
           <div className="flex items-center gap-3 min-w-0">
             <span className="wordmark text-xl sm:text-2xl text-ink whitespace-nowrap">Debug Dojo</span>
             <span className="pill hidden sm:inline-flex">道場</span>
+            {CONFIG.USE_MOCK && (
+              <span className="pill !bg-ochre/15 !text-ochre hidden sm:inline-flex" title="Running in simulated offline demo mode">
+                Demo Mode
+              </span>
+            )}
             <span className="text-xs font-mono text-ink-soft hidden xl:inline truncate">
               Learn to find bugs in your own Python code
             </span>
