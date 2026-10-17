@@ -1,0 +1,32 @@
+[
+  {
+    "args": [[]],
+    "expected": 0,
+    "category": "empty_list"
+  },
+  {
+    "args": [[0]],
+    "expected": 1,
+    "category": "single_zero_even"
+  },
+  {
+    "args": [[-2, -3, -4, -5]],
+    "expected": 2,
+    "category": "negative_numbers"
+  },
+  {
+    "args": [[100, 101, 102, 103]],
+    "expected": 2,
+    "category": "consecutive_integers"
+  },
+  {
+    "args": [[7]],
+    "expected": 0,
+    "category": "single_odd"
+  },
+  {
+    "args": [[0, 0, 0]],
+    "expected": 3,
+    "category": "multiple_zeros"
+  }
+]

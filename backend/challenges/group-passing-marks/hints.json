@@ -1,0 +1,12 @@
+{
+  "boundary_comparison": [
+    "Which bucket should receive a score that lands exactly on the passing boundary?",
+    "Scores of exactly forty are placed into the failing group instead of the passing group.",
+    "Ensure that marks meeting or exceeding forty are appended to the passing list, while lower marks are appended to the failing list."
+  ],
+  "generic": [
+    "How can key-value mappings categorize records into separate buckets while preserving order?",
+    "The structure breaks when input contains no records or when items are sorted instead of preserving insertion order.",
+    "Create two separate lists for passing and failing names, check each student score, place each student into the appropriate list in order, and assemble them into the result dictionary."
+  ]
+}

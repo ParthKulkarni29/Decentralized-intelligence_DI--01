@@ -1,0 +1,32 @@
+[
+  {
+    "args": [[], 3],
+    "expected": [],
+    "category": "empty_list"
+  },
+  {
+    "args": [[42], 5],
+    "expected": [42],
+    "category": "single_element_large_k"
+  },
+  {
+    "args": [[1, 2, 3, 4], 4],
+    "expected": [1, 2, 3, 4],
+    "category": "k_equals_length"
+  },
+  {
+    "args": [[1, 2, 3, 4, 5], 7],
+    "expected": [4, 5, 1, 2, 3],
+    "category": "k_larger_than_length"
+  },
+  {
+    "args": [[10, 20, 30, 40, 50, 60], 3],
+    "expected": [40, 50, 60, 10, 20, 30],
+    "category": "halfway_rotation"
+  },
+  {
+    "args": [[1, 2, 3], 100],
+    "expected": [3, 1, 2],
+    "category": "large_k_modulo"
+  }
+]

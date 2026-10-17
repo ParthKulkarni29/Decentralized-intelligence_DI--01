@@ -1,0 +1,17 @@
+[
+  {
+    "args": [[1, 2, 3, 4]],
+    "expected": [1, 3, 6, 10],
+    "category": "positive_sequence"
+  },
+  {
+    "args": [[5]],
+    "expected": [5],
+    "category": "single_element"
+  },
+  {
+    "args": [[10, -2, 5]],
+    "expected": [10, 8, 13],
+    "category": "with_negative_numbers"
+  }
+]

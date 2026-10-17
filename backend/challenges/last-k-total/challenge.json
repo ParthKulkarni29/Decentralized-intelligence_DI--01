@@ -1,0 +1,31 @@
+{
+  "id": "last-k-total",
+  "title": "Last K Total",
+  "difficulty": "easy",
+  "concepts": [
+    "lists",
+    "indexing",
+    "edge_cases"
+  ],
+  "description": "Return the total of the last k marks. If k is larger than the list, use all marks.",
+  "starter_code": "def last_k_total(marks, k):\n    pass\n",
+  "function_name": "last_k_total",
+  "arg_names": [
+    "marks",
+    "k"
+  ],
+  "targets_mistakes": [
+    "unhandled_short_input",
+    "off_by_one"
+  ],
+  "boundary_values": [
+    0
+  ],
+  "sort_order": 1,
+  "short_input_categories": [
+    "empty_list",
+    "single_element",
+    "k_larger_than_list",
+    "k_zero"
+  ]
+}

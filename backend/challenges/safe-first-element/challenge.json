@@ -1,0 +1,31 @@
+{
+  "id": "safe-first-element",
+  "title": "Safe First Element",
+  "difficulty": "easy",
+  "concepts": [
+    "edge_cases",
+    "lists"
+  ],
+  "description": "Returns the first element of items if items is not empty, otherwise returns default. items is a list. default can be any value.",
+  "starter_code": "def safe_first_element(items, default):\n    pass\n",
+  "function_name": "safe_first_element",
+  "arg_names": [
+    "items",
+    "default"
+  ],
+  "targets_mistakes": [
+    "unhandled_short_input",
+    "off_by_one",
+    "print_not_return"
+  ],
+  "boundary_values": [
+    0
+  ],
+  "sort_order": 5,
+  "short_input_categories": [
+    "empty_list_with_default",
+    "empty_list_none_default",
+    "empty_list_string_default",
+    "single_element_list"
+  ]
+}

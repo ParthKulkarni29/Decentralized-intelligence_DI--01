@@ -1,0 +1,12 @@
+{
+  "mutates_input": [
+    "Should calculating cumulative statistics modify the numbers in the original container?",
+    "Overwriting elements in the input list changes the caller's data and can corrupt subsequent running calculations.",
+    "Build a new list of partial sums step by step rather than updating the input list in place."
+  ],
+  "generic": [
+    "How does an accumulator variable capture a progressive sequence of cumulative totals?",
+    "The accumulation fails on an empty list or when the running total resets prematurely.",
+    "Initialize a cumulative sum at zero, iterate through each number adding it to the sum, and append each progressive sum to a new output list."
+  ]
+}

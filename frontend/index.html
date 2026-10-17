@@ -1,0 +1,3581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Debug Dojo — learn to find bugs in your own Python code.">
+  <title>Debug Dojo — Coaching Tool</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23c8322b'/%3E%3Ctext x='32' y='47' font-size='40' text-anchor='middle' fill='%23fff3ee'%3E道%3C/text%3E%3C/svg%3E">
+
+  <!-- Design system: self-hosted fonts, tokens, glass surfaces, buttons, petals, lanterns, motion -->
+  <link rel="stylesheet" href="assets/sakura.css">
+  <link rel="stylesheet" href="assets/vendor/codemirror.css">
+
+  <!-- Tailwind CSS (offline pinned v3.4.16) -->
+  <script src="assets/vendor/tailwindcss.js"></script>
+
+  <!-- React, ReactDOM, Babel (offline pinned: React 18.3.1, ReactDOM 18.3.1, Babel 7.26.4) -->
+  <script src="assets/vendor/react.production.min.js"></script>
+  <script src="assets/vendor/react-dom.production.min.js"></script>
+  <script src="assets/vendor/babel.min.js"></script>
+
+  <!-- CodeMirror 5 (offline pinned v5.65.18 with Python mode) -->
+  <script src="assets/vendor/codemirror.js"></script>
+  <script src="assets/vendor/codemirror-python.js"></script>
+
+  <script>
+    // Colours are RGB channels defined in assets/sakura.css, so opacity modifiers (bg-seal/15) work.
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Shippori Mincho"', 'serif'],
+            sans: ['"IBM Plex Sans"', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'monospace'],
+          },
+          colors: {
+            paper: 'rgb(var(--paper-rgb) / <alpha-value>)',
+            'paper-deep': 'rgb(var(--paper-deep-rgb) / <alpha-value>)',
+            ink: 'rgb(var(--ink-rgb) / <alpha-value>)',
+            'ink-soft': 'rgb(var(--ink-soft-rgb) / <alpha-value>)',
+            seal: 'rgb(var(--seal-rgb) / <alpha-value>)',
+            sakura: 'rgb(var(--sakura-rgb) / <alpha-value>)',
+            blossom: 'rgb(var(--blossom-rgb) / <alpha-value>)',
+            pine: 'rgb(var(--pine-rgb) / <alpha-value>)',
+            ochre: 'rgb(var(--ochre-rgb) / <alpha-value>)',
+            indigo: 'rgb(var(--indigo-rgb) / <alpha-value>)',
+            lantern: 'rgb(var(--lantern-rgb) / <alpha-value>)',
+          },
+          boxShadow: {
+            soft: 'var(--shadow-soft)',
+            lift: 'var(--shadow-lift)',
+          },
+        }
+      }
+    };
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- APPLICATION CODE IN REACT -->
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useRef } = React;
+
+    // --- CONFIG & TYPES ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const CONFIG = {
+      API_BASE: "http://localhost:8000",
+      USE_MOCK: urlParams.get("mock") === "1"
+    };
+
+    // --- MOCK DATA ---
+    const MOCK_CHALLENGES = [
+      {
+        id: "count-passes",
+        title: "Count Passes",
+        difficulty: "easy",
+        concepts: ["loops", "conditions"],
+        status: "solved",
+        description: "Given a list of test marks, count how many students scored 50 or higher.",
+        starter_code: "def count_passes(marks):\n    # Count scores >= 50\n    pass\n",
+        visible_tests: [
+          { test: 1, call: "count_passes([40, 60, 80])", expected: "2" },
+          { test: 2, call: "count_passes([10, 20])", expected: "0" }
+        ],
+        hidden_test_count: 4,
+        arg_names: ["marks"]
+      },
+      {
+        id: "first-n-squares",
+        title: "First N Squares",
+        difficulty: "easy",
+        concepts: ["loops", "math"],
+        status: "attempted",
+        description: "Generate a list of squares for integers from 1 up to N.",
+        starter_code: "def first_n_squares(n):\n    pass\n",
+        visible_tests: [
+          { test: 1, call: "first_n_squares(3)", expected: "[1, 4, 9]" }
+        ],
+        hidden_test_count: 5,
+        arg_names: ["n"]
+      },
+      {
+        id: "last-k-total",
+        title: "Last K Total",
+        difficulty: "easy",
+        concepts: ["lists", "indexing", "edge_cases"],
+        status: "attempted",
+        description: "Return the total of the last k marks. If k is larger than the list, use all marks.",
+        starter_code: "def last_k_total(marks, k):\n    pass\n",
+        visible_tests: [
+          { test: 1, call: "last_k_total([10, 20, 30, 40], 2)", expected: "70" },
+          { test: 2, call: "last_k_total([5, 5, 5], 3)", expected: "15" },
+          { test: 3, call: "last_k_total([7], 1)", expected: "7" }
+        ],
+        hidden_test_count: 6,
+        arg_names: ["marks", "k"]
+      },
+      {
+        id: "middle-three",
+        title: "Middle Three",
+        difficulty: "easy",
+        concepts: ["indexing", "lists"],
+        status: "attempted",
+        description: "Extract the exact middle 3 items from an odd-length sequence.",
+        starter_code: "def middle_three(items):\n    pass\n",
+        visible_tests: [
+          { test: 1, call: "middle_three([1,2,3,4,5])", expected: "[2, 3, 4]" }
+        ],
+        hidden_test_count: 4,
+        arg_names: ["items"]
+      },
+      {
+        id: "safe-first-element",
+        title: "Safe First Element",
+        difficulty: "easy",
+        concepts: ["edge_cases", "conditions"],
+        status: "new",
+        description: "Return the first element or None if the collection is empty.",
+        starter_code: "def safe_first(arr):\n    pass\n",
+        visible_tests: [
+          { test: 1, call: "safe_first([42])", expected: "42" },
+          { test: 2, call: "safe_first([])", expected: "None" }
+        ],
+        hidden_test_count: 5,
+        arg_names: ["arr"]
+      },
+      {
+        id: "count-even",
+        title: "Count Even",
+        difficulty: "medium",
+        concepts: ["loops", "conditions"],
+        status: "new",
+        description: "Count all even numbers in a given integer list.",
+        starter_code: "def count_even(nums):\n    pass\n",
+        visible_tests: [{ test: 1, call: "count_even([1, 2, 3, 4])", expected: "2" }],
+        hidden_test_count: 4,
+        arg_names: ["nums"]
+      },
+      {
+        id: "remove-duplicates",
+        title: "Remove Duplicates",
+        difficulty: "medium",
+        concepts: ["lists", "sets"],
+        status: "new",
+        description: "Preserve order while removing subsequent occurrences of elements.",
+        starter_code: "def remove_duplicates(lst):\n    pass\n",
+        visible_tests: [{ test: 1, call: "remove_duplicates([1, 2, 1, 3])", expected: "[1, 2, 3]" }],
+        hidden_test_count: 6,
+        arg_names: ["lst"]
+      },
+      {
+        id: "running-total",
+        title: "Running Total",
+        difficulty: "medium",
+        concepts: ["loops", "accumulation"],
+        status: "new",
+        description: "Compute the cumulative sum at each index of a numerical array.",
+        starter_code: "def running_total(arr):\n    pass\n",
+        visible_tests: [{ test: 1, call: "running_total([1, 2, 3])", expected: "[1, 3, 6]" }],
+        hidden_test_count: 5,
+        arg_names: ["arr"]
+      },
+      {
+        id: "rotate-list",
+        title: "Rotate List",
+        difficulty: "hard",
+        concepts: ["indexing", "modular_math"],
+        status: "new",
+        description: "Rotate a list to the right by k places where k >= 0.",
+        starter_code: "def rotate_list(nums, k):\n    pass\n",
+        visible_tests: [{ test: 1, call: "rotate_list([1, 2, 3, 4], 1)", expected: "[4, 1, 2, 3]" }],
+        hidden_test_count: 7,
+        arg_names: ["nums", "k"]
+      },
+      {
+        id: "group-passing-marks",
+        title: "Group Passing Marks",
+        difficulty: "hard",
+        concepts: ["dictionaries", "lists"],
+        status: "new",
+        description: "Partition students into passing and failing buckets based on threshold.",
+        starter_code: "def group_marks(records, threshold):\n    pass\n",
+        visible_tests: [{ test: 1, call: "group_marks({'Alice': 70}, 50)", expected: "{'pass': ['Alice'], 'fail': []}" }],
+        hidden_test_count: 6,
+        arg_names: ["records", "threshold"]
+      }
+    ];
+
+    // Mock-mode port of backend/engine/code_hints.py: inspects the typed code and returns findings (most important
+    // first), each a 3-layer ladder (Nudge / Pointer / Approach). The real backend parses Python properly with `ast`;
+    // this is a close regex approximation so the standalone preview behaves the same way.
+    const PY_KEYWORDS = new Set("False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case".split(" "));
+    const PY_BUILTINS = new Set("abs aiter all anext any ascii bin bool breakpoint bytearray bytes callable chr classmethod compile complex copyright credits delattr dict dir divmod enumerate eval exec exit filter float format frozenset getattr globals hasattr hash help hex id input int isinstance issubclass iter len license list locals map max memoryview min next object oct open ord pow print property quit range repr reversed round set setattr slice sorted staticmethod str sum super tuple type vars zip __name__ __file__ __doc__ self cls Exception ValueError TypeError KeyError IndexError NameError RuntimeError StopIteration ZeroDivisionError AttributeError ImportError OSError ArithmeticError AssertionError NotImplemented Ellipsis BaseException KeyboardInterrupt".split(" "));
+    const PY_SHADOW = new Set("sum max min len list dict set str int float sorted input print type id all any map filter range abs round zip next iter format hash object open bool tuple reversed enumerate".split(" "));
+
+    function mockCodeFindings(code, challengeId) {
+      const FN = { "last-k-total": ["last_k_total", ["marks", "k"]] }[challengeId];
+      const sigAny = code.match(/def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/);
+      const fname = FN ? FN[0] : (sigAny ? sigAny[1] : "your function");
+      const L = (kind, n, p, a) => ({ kind, ladder: [n, p, a] });
+      const out = [];
+      const DQ3 = '"'.repeat(3), SQ3 = "'".repeat(3);
+      const strRe = new RegExp("(" + DQ3 + "[\\s\\S]*?" + DQ3 + "|" + SQ3 + "[\\s\\S]*?" + SQ3 + "|\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*')", "g");
+      const stripStr = (t) => t.replace(strRe, (m) => '"' + " ".repeat(Math.max(0, m.length - 2)) + '"').replace(/\b[rbfuRBFU]{1,2}(?=")/g, "");
+      const clean = stripStr(code).replace(/#.*$/gm, "");
+      const cleanLines = clean.split("\n");
+      if (!clean.trim()) return [L("empty_editor", "What does the problem ask your function to hand back, and what does it receive?", "The editor is empty, so there is nothing to check yet. A function needs a name, its inputs and a result.", `Start by writing the function ${fname} with the inputs from the problem, say in words how you would get the answer by hand, then turn each step into a line.`)];
+
+      // 1. syntax problems
+      const KW_LEAD = /^(def|class|if|elif|else|for|while|try|except|finally|with|return|import|from|pass|break|continue|raise|assert|del|global|nonlocal|lambda|yield|print|not|and|or|in|is|async|await|match|case)$/;
+      let synLine = 0, why = "";
+      const stack = []; const pair = { ")": "(", "]": "[", "}": "{" };
+      for (let i = 0; i < cleanLines.length && !synLine; i++) {
+        const t = cleanLines[i];
+        if (!t.trim()) continue;
+        const open = stack.length > 0;
+        if (!open && /^\s*(def|class|if|elif|else|for|while|try|except|finally|with)\b/.test(t) && !/:\s*$/.test(t) && !/:\s*\S/.test(t)) { synLine = i + 1; why = "expected ':'"; break; }
+        const m = t.match(/^\s*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)/);
+        if (!open && m && !KW_LEAD.test(m[1]) && !KW_LEAD.test(m[2])) { synLine = i + 1; why = "invalid syntax"; break; }
+        for (const ch of t) {
+          if ("([{".includes(ch)) stack.push([ch, i + 1]);
+          else if (")]}".includes(ch)) { const top = stack.pop(); if (!top || top[0] !== pair[ch]) { synLine = i + 1; why = "unmatched bracket"; break; } }
+        }
+      }
+      if (!synLine && stack.length) { synLine = stack[stack.length - 1][1]; why = "unclosed bracket"; }
+      if (synLine) return [L("syntax_error", "Python reads your file from top to bottom. Where could it get confused about what you meant?", `Python cannot even read your code: it stopped around line ${synLine} (${why}). The real slip is often on that line or the one just before it.`, "Check that every opening bracket or quote is closed, every if/for/def line ends with a colon, there are no two words side by side, and the indentation is consistent. Fix the first problem Python reports, then try again.")];
+
+      // 2. general problems (any Python code): names used but never created, built-ins hidden by variables
+      const bound = new Set(); let star = false;
+      const addNames = (txt) => (txt.match(/[A-Za-z_]\w*/g) || []).forEach((n) => { if (!PY_KEYWORDS.has(n)) bound.add(n); });
+      for (const line of cleanLines) {
+        let m;
+        if ((m = line.match(/^\s*(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)/))) { bound.add(m[1]); m[2].split(",").forEach((x) => addNames(x.split(/[=:]/)[0])); }
+        if ((m = line.match(/^\s*class\s+(\w+)/))) bound.add(m[1]);
+        const imp = line.match(/^\s*(?:from\s+[\w.]+\s+)?import\s+(.+)$/);
+        if (imp) { if (/\*/.test(imp[1])) star = true; imp[1].split(",").forEach((part) => { const mm = part.trim().split(/\s+as\s+/); addNames((mm[1] || mm[0]).split(".")[0]); }); }
+        for (const f of line.matchAll(/\bfor\s+([^:]+?)\s+in\b/g)) addNames(f[1]);
+        for (const w of line.matchAll(/\bas\s+([A-Za-z_]\w*)/g)) bound.add(w[1]);
+        for (const lam of line.matchAll(/\blambda\s*([^:]*):/g)) addNames(lam[1].replace(/=[^,]*/g, ""));
+        for (const wal of line.matchAll(/([A-Za-z_]\w*)\s*:=/g)) bound.add(wal[1]);
+        if ((m = line.match(/^\s*(?:global|nonlocal)\s+(.+)$/))) addNames(m[1]);
+        // assignment targets: everything left of a plain/augmented "=" (not ==, <=, >=, !=), at statement level
+        if (!/^\s*(?:def|class|if|elif|while|return|assert|print)\b/.test(line)) {
+          const eq = line.search(/(?:\*\*|\/\/|>>|<<|[-+*\/%&|^@])?=(?!=)/);
+          if (eq > 0 && !/[<>!=]$/.test(line.slice(0, eq).trimEnd())) {
+            line.slice(0, eq).split(/=(?!=)/).forEach((seg) => seg.replace(/\[[^\]]*\]/g, "").replace(/\.\w+/g, "").replace(/[A-Za-z_]\w*\s*\(/g, "").split(/[,\s()*]+/).forEach((tok) => { if (/^[A-Za-z_]\w*$/.test(tok) && !PY_KEYWORDS.has(tok)) bound.add(tok); }));
+          }
+        }
+      }
+      const known = (n) => bound.has(n) || PY_BUILTINS.has(n) || PY_KEYWORDS.has(n);
+      if (!star) {
+        let first = null;
+        for (let i = 0; i < cleanLines.length && !first; i++) {
+          const line = cleanLines[i];
+          for (const m of line.matchAll(/(?<![\w.])([A-Za-z_]\w*)/g)) {
+            const n = m[1]; const after = line.slice(m.index + n.length);
+            if (known(n)) continue;
+            if (/^\s*=(?!=)/.test(after) && /[(,]\s*$/.test(line.slice(0, m.index))) continue; // keyword argument name
+            first = { n, line: i + 1 }; break;
+          }
+        }
+        if (first) {
+          const pool = [...bound, ...PY_BUILTINS].filter((k) => !k.startsWith("__"));
+          const sameLetters = pool.some((k) => k.toLowerCase() === first.n.toLowerCase() && k !== first.n);
+          if (sameLetters) out.push(L("undefined_name_case", "Python treats uppercase and lowercase letters as different. Do all your names use exactly the same capitals everywhere?", `Line ${first.line} uses ${first.n}, but nothing with that exact spelling exists in your code. You do have a name that is spelled the same except for capital letters.`, "Pick one spelling for each thing and use it exactly the same way every time you create it and every time you read it."));
+          else out.push(L("undefined_name", "Python stops with an error when it reaches a name it has never seen. Which names did you create, and which did you only use?", `Line ${first.line} uses ${first.n}, but your code never creates anything with that name.`, "Create the value before the line that needs it, or fix the spelling so it matches the name you created."));
+        }
+      }
+      for (let i = 0; i < cleanLines.length; i++) {
+        const m = cleanLines[i].match(/^\s*([A-Za-z_]\w*)\s*(?:[-+*\/%]|\/\/|\*\*)?=(?!=)/);
+        if (m && PY_SHADOW.has(m[1])) { out.push(L("shadowed_builtin", "Python already gives you some ready-made tools with simple names. Could one of your variable names collide with one of them?", `On line ${i + 1} you create a variable called ${m[1]}, which hides Python's own ${m[1]} from then on.`, "Give that variable a more descriptive name that says what it holds, so the built-in tool stays available.")); break; }
+      }
+
+      // 3. challenge-specific problems
+      const def = clean.match(new RegExp("def\\s+" + fname + "\\s*\\(([^)]*)\\)\\s*:"));
+      const params = FN ? FN[1] : (sigAny ? sigAny[2].split(",").map((x) => x.trim().split(/[=:]/)[0].trim()).filter(Boolean) : []);
+      if (FN && !def) { out.push(L("missing_function", "How does the checker know which of your functions to call?", `Nothing in your code is named ${fname}. The checker looks for exactly that name.`, `Define a function named ${fname} that takes ${params.join(", ")} and keep your logic inside it.`)); return out; }
+      if (!def) return out;
+      const body = clean.slice(clean.indexOf(def[0]) + def[0].length);
+      const real = body.split("\n").filter((l) => l.trim() && !/^\s*(pass|\.\.\.|["'].*["'])\s*$/.test(l));
+      if (real.length === 0) { out.push(L("placeholder_body", "If you ran the function right now, what would it hand back?", `${fname} does not compute anything yet: its body is only a placeholder. Nothing is being returned.`, "Say in plain words how you would get the answer by hand for one example, then write one line per step and finish by giving the result back to the caller.")); return out; }
+      if (!/\breturn\s+\S/.test(body)) {
+        if (/\bprint\s*\(/.test(body)) out.push(L("print_without_return", "How does the code that calls your function get the answer back from it?", "Your function shows a result on the screen, but nothing is handed back to the caller, so the caller receives nothing.", "Keep the calculation, but give the finished answer back to the caller instead of only displaying it."));
+        else out.push(L("no_return", "When your function reaches its last line, what does the caller get?", `${fname} never hands a value back, so the caller always receives nothing.`, "Work out the final answer in a variable, then end the function by giving that value back."));
+      }
+      const unused = params.filter((pn) => !new RegExp("\\b" + pn + "\\b").test(body));
+      if (unused.length) out.push(L("unused_input", "Does the answer depend on every piece of information the function is given?", `The input(s) ${unused.join(", ")} are never used in your logic, so the result cannot depend on them.`, "Decide how each input should influence the answer, then use it in the calculation."));
+      if (params.some((pn) => new RegExp("\\b" + pn + "\\.(append|extend|insert|pop|remove|sort|reverse|clear)\\(|\\b" + pn + "\\[[^\\]]*\\]\\s*[+\\-*]?=(?!=)").test(body))) out.push(L("mutates_input", "Who else might be holding on to the data you were given, and what happens if you change it?", "Your code changes the caller's own data instead of working on a copy.", "Leave the input untouched: build a new value for your answer, or work on a copy of the input."));
+      const neg = body.match(/\[\s*-\s*([A-Za-z_]\w*)\s*:\s*\]/);
+      if (neg && params.includes(neg[1]) && !new RegExp("[<>=!]=?\\s*" + neg[1] + "\\b|\\b" + neg[1] + "\\s*[<>=!]").test(body)) out.push(L("negative_slice_unguarded", "What does counting backwards from the end do when the count is 0, or larger than the list?", `You slice from the end using -${neg[1]} with no check on its value. Zero and oversized counts behave surprisingly with negative positions.`, "Handle the zero case and the 'count is bigger than the list' case on their own before slicing, or compute a start position that can never go below the first item."));
+      if (/while\s+True\s*:/.test(body) && !/\b(break|return)\b/.test(body)) out.push(L("endless_loop", "What has to happen inside your loop for it to ever stop?", "Your loop has no way out, so it keeps running forever and the test times out.", "Give the loop an exit: change something each pass until a stopping condition becomes true, or leave it with an explicit break or return when you are done."));
+      return out;
+    }
+    function mockCodeHintLadder(code, challengeId) {
+      const f = mockCodeFindings(code, challengeId);
+      return f.length ? f[0].ladder : null;
+    }
+
+    const MOCK_HINTS_LAST_K = [
+      "What should happen when the requested window is larger than the entire list?",
+      "When the requested count exceeds the list length, computing a negative starting offset wraps around and adds items multiple times.",
+      "Ensure the starting position never drops below zero by taking the entire list when the requested count exceeds available items."
+    ];
+
+    const MOCK_LEARNER = {
+      learner_id: "zen_coder_409",
+      stats: {
+        bugs_defeated: 12,
+        independent_streak: 3,
+        longest_streak: 7,
+        hint_assisted_solves: 4,
+        prediction_accuracy: 0.71,
+        xp: 120
+      },
+      recurring_mistakes: [
+        {
+          tag: "unhandled_short_input",
+          challenges: ["last-k-total", "middle-three"],
+          count: 3,
+          description: "Indexing or slicing under assumptions that array length >= requested window."
+        }
+      ],
+      bug_dna: [
+        { tag: "unhandled_short_input", count: 3 },
+        { tag: "off_by_one", count: 2 },
+        { tag: "boundary_comparison", count: 1 }
+      ],
+      mastery: {
+        loops: 0.81,
+        lists: 0.64,
+        indexing: 0.58,
+        conditions: 0.73,
+        edge_cases: 0.40,
+        functions: 0.70
+      },
+      next_challenge: {
+        id: "safe-first-element",
+        title: "Safe First Element",
+        reason: "You made the same mistake (unhandled short input) in last-k-total and middle-three. This challenge gives you another chance to practise it."
+      },
+      achievements: ["First Bug", "No-Hint Streak"]
+    };
+
+    const MOCK_HISTORY = [
+      {
+        submission_id: "sub_101",
+        challenge_id: "last-k-total",
+        created_at: "Today, 14:20",
+        all_passed: false,
+        passed_count: 3,
+        failed_count: 3,
+        mistake_tags: ["unhandled_short_input"],
+        hints_used: 1
+      },
+      {
+        submission_id: "sub_098",
+        challenge_id: "count-passes",
+        created_at: "Yesterday, 19:15",
+        all_passed: true,
+        passed_count: 6,
+        failed_count: 0,
+        mistake_tags: [],
+        hints_used: 0
+      },
+      {
+        submission_id: "sub_085",
+        challenge_id: "middle-three",
+        created_at: "3 days ago",
+        all_passed: false,
+        passed_count: 2,
+        failed_count: 3,
+        mistake_tags: ["unhandled_short_input"],
+        hints_used: 2
+      }
+    ];
+
+    // --- SESSION & AUTH HELPERS ---
+    // The bearer token lives in sessionStorage (per tab, cleared when the tab closes). PINs and
+    // one-time codes are never stored. Learners without a PIN/identity keep working as guests.
+    const SESSION_KEY = "debugdojo_session";
+    const DEFAULT_LEARNER = "zen_coder_409";
+    const Session = {
+      current: null,
+      load() {
+        try {
+          const v = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
+          return v && v.learnerId && v.token ? v : null;
+        } catch (e) { return null; }
+      },
+      save(s) {
+        Session.current = s;
+        try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch (e) {}
+      },
+      clear() {
+        Session.current = null;
+        try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+      },
+    };
+    Session.current = Session.load();
+
+    function authHeaders(extra = {}) {
+      return Session.current ? { ...extra, Authorization: `Bearer ${Session.current.token}` } : extra;
+    }
+
+    class ApiError extends Error {
+      constructor(message, status) { super(message); this.status = status; }
+    }
+
+    // Turn a non-2xx response into an ApiError carrying the backend's {"error": "..."} message.
+    async function ensureOk(res, fallback) {
+      if (res.ok) return res;
+      const body = await res.json().catch(() => ({}));
+      const detail = body.error || body.detail;
+      throw new ApiError(typeof detail === "string" ? detail : `${fallback} (${res.status})`, res.status);
+    }
+
+    function mockSlug(name) {
+      return (name || "learner").trim().replace(/[^a-zA-Z0-9_-]+/g, "_").toLowerCase().slice(0, 30) || "learner";
+    }
+
+    // --- AUTH API (pseudonymous PIN, Google, phone one-time code) ---
+    const authApi = {
+      async providers() {
+        if (CONFIG.USE_MOCK) {
+          return { pin: { enabled: true }, google: { enabled: false, client_id: null }, phone: { enabled: true, delivery: "console", dev_mode: true } };
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/auth/providers`);
+        await ensureOk(res, "Could not load sign-in options");
+        return res.json();
+      },
+      async register(display_name, pin) {
+        if (CONFIG.USE_MOCK) return { learner_id: mockSlug(display_name), token: "mock-token" };
+        const body = { display_name };
+        if (pin) body.pin = pin;
+        const res = await fetch(`${CONFIG.API_BASE}/api/auth/register`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+        await ensureOk(res, "Could not create your profile");
+        return res.json();
+      },
+      async login(learner_id, pin) {
+        if (CONFIG.USE_MOCK) return { learner_id, token: "mock-token" };
+        const res = await fetch(`${CONFIG.API_BASE}/api/auth/login`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ learner_id, pin }),
+        });
+        await ensureOk(res, "Sign-in failed");
+        const data = await res.json();
+        return { learner_id, token: data.token };
+      },
+      async google(credential, display_name) {
+        if (CONFIG.USE_MOCK) throw new ApiError("Google sign-in is not available in mock mode.", 503);
+        const res = await fetch(`${CONFIG.API_BASE}/api/auth/google`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential, display_name: display_name || undefined }),
+        });
+        await ensureOk(res, "Google sign-in failed");
+        return res.json();
+      },
+      async phoneRequest(phone) {
+        if (CONFIG.USE_MOCK) return { sent: true, expires_in: 300, delivery: "console" };
+        const res = await fetch(`${CONFIG.API_BASE}/api/auth/phone/request`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone }),
+        });
+        await ensureOk(res, "Could not send the code");
+        return res.json();
+      },
+      async phoneVerify(phone, code, display_name) {
+        if (CONFIG.USE_MOCK) {
+          if (code !== "123456") throw new ApiError("That code is invalid or has expired. (mock mode code: 123456)", 401);
+          return { learner_id: mockSlug(display_name || "phone_learner"), token: "mock-token", is_new: true };
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/auth/phone/verify`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, code, display_name: display_name || undefined }),
+        });
+        await ensureOk(res, "Verification failed");
+        return res.json();
+      },
+    };
+
+    // --- API CLIENT (Data Layer) ---
+    const api = {
+      async listChallenges() {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 400));
+          return MOCK_CHALLENGES.map(c => ({
+            id: c.id,
+            title: c.title,
+            difficulty: c.difficulty,
+            concepts: c.concepts,
+            status: c.status
+          }));
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/challenges`);
+        await ensureOk(res, "Could not load challenges");
+        return res.json();
+      },
+
+      async getChallenge(id) {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 400));
+          return MOCK_CHALLENGES.find(c => c.id === id) || MOCK_CHALLENGES[2];
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/challenges/${id}`);
+        await ensureOk(res, "Could not load challenge");
+        return res.json();
+      },
+
+      async run(learner_id, challenge_id, code) {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 450));
+          const ch = MOCK_CHALLENGES.find(c => c.id === challenge_id) || MOCK_CHALLENGES[2];
+          const live = code.replace(/#.*$/gm, "");
+          const isError = live.includes("raise ");
+          const isTimeout = live.includes("while True");
+          const isWrong = !live.includes("max(") && !live.includes("sum(1 for");
+          return {
+            visible: ch.visible_tests.map((vt, i) => {
+              if (isTimeout) {
+                return { test: vt.test, call: vt.call, expected: vt.expected, got: "timeout", outcome: "timeout" };
+              }
+              if (isError) {
+                return { test: vt.test, call: vt.call, expected: vt.expected, got: null, outcome: "runtime_error", error: "ValueError" };
+              }
+              if (isWrong && i > 0) {
+                return { test: vt.test, call: vt.call, expected: vt.expected, got: "None", outcome: "wrong_output" };
+              }
+              return { test: vt.test, call: vt.call, expected: vt.expected, got: vt.expected, outcome: "passed" };
+            })
+          };
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/run`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ learner_id, challenge_id, code })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || err.detail || `Run failed (${res.status})`);
+        }
+        return res.json();
+      },
+
+      async submit(learner_id, challenge_id, code, prediction) {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 800));
+          // Mock submission rules according to instructions
+          const live = code.replace(/#.*$/gm, ""); // ignore comments when matching mock rules
+          if (live.includes("len(marks) - k") && !live.includes("max(")) {
+            return {
+              submission_id: "sub_" + Math.random().toString(36).substr(2, 6),
+              learner_id,
+              challenge_id,
+              visible: [
+                { test: 1, call: "last_k_total([10, 20, 30, 40], 2)", expected: "70", got: "70", outcome: "passed" },
+                { test: 2, call: "last_k_total([5, 5, 5], 3)", expected: "15", got: "15", outcome: "passed" },
+                { test: 3, call: "last_k_total([7], 1)", expected: "7", got: "7", outcome: "passed" }
+              ],
+              hidden: [
+                { test: 1, outcome: "passed" },
+                { test: 2, outcome: "passed" },
+                { test: 3, outcome: "runtime_error" },
+                { test: 4, outcome: "wrong_output" },
+                { test: 5, outcome: "wrong_output" },
+                { test: 6, outcome: "passed" }
+              ],
+              all_passed: false,
+              mistake_tags: ["unhandled_short_input"],
+              explanation: "All 3 visible tests pass, but 3 of the 6 hidden tests fail: one crashes and two give the wrong total. All three are cases where k is larger than the number of marks. Look at where your loop starts.",
+              hints_available: 3,
+              prediction_result: {
+                predicted: prediction || "some_fail",
+                actual: "some_fail",
+                correct: (!prediction || prediction === "some_fail")
+              },
+              arena: {
+                defeated: ["Example inputs"],
+                remaining: ["Large K input", "Empty list", "Single element"]
+              }
+            };
+          } else if (code.includes("while True")) {
+            return {
+              submission_id: "sub_timeout_" + Math.random().toString(36).substr(2, 6),
+              learner_id,
+              challenge_id,
+              visible: [
+                { test: 1, call: "last_k_total([10, 20], 1)", expected: "20", got: "timeout", outcome: "timeout" }
+              ],
+              hidden: [
+                { test: 1, outcome: "timeout", limit: "output" },
+                { test: 2, outcome: "timeout" },
+                { test: 3, outcome: "timeout" },
+                { test: 4, outcome: "timeout" }
+              ],
+              all_passed: false,
+              mistake_tags: ["infinite_loop"],
+              explanation: "Execution timed out while running test evaluations.",
+              hints_available: 2,
+              prediction_result: { predicted: prediction || "timeout", actual: "timeout", correct: (!prediction || prediction === "timeout") },
+              arena: { defeated: [], remaining: ["Example inputs", "Standard cases"] }
+            };
+          } else if (live.includes("max(") || live.includes("sum(1 for")) {
+            return {
+              submission_id: "sub_success_" + Math.random().toString(36).substr(2, 6),
+              learner_id,
+              challenge_id,
+              visible: [
+                { test: 1, call: "last_k_total([10, 20, 30, 40], 2)", expected: "70", got: "70", outcome: "passed" },
+                { test: 2, call: "last_k_total([5, 5, 5], 3)", expected: "15", got: "15", outcome: "passed" },
+                { test: 3, call: "last_k_total([7], 1)", expected: "7", got: "7", outcome: "passed" }
+              ],
+              hidden: [
+                { test: 1, outcome: "passed" },
+                { test: 2, outcome: "passed" },
+                { test: 3, outcome: "passed" },
+                { test: 4, outcome: "passed" },
+                { test: 5, outcome: "passed" },
+                { test: 6, outcome: "passed" }
+              ],
+              all_passed: true,
+              mistake_tags: [],
+              explanation: "Splendid mastery! All visible and hidden tests passed seamlessly.",
+              hints_available: 0,
+              prediction_result: { predicted: prediction || "all_pass", actual: "all_pass", correct: (!prediction || prediction === "all_pass") },
+              arena: { defeated: ["Example inputs", "Large K input", "Empty list", "Single element"], remaining: [] }
+            };
+          } else {
+            return {
+              submission_id: "sub_misc_" + Math.random().toString(36).substr(2, 6),
+              learner_id,
+              challenge_id,
+              visible: [
+                { test: 1, call: "last_k_total([10, 20, 30, 40], 2)", expected: "70", got: "None", outcome: "wrong_output" }
+              ],
+              hidden: [
+                { test: 1, outcome: "wrong_output" },
+                { test: 2, outcome: "wrong_output" }
+              ],
+              all_passed: false,
+              mistake_tags: ["unimplemented"],
+              explanation: "The starter template returned an unexpected value.",
+              hints_available: 3,
+              prediction_result: null,
+              arena: { defeated: [], remaining: ["Example inputs", "Standard cases"] }
+            };
+          }
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/submit`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ learner_id, challenge_id, code, prediction })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || err.detail || `Submission failed (${res.status})`);
+        }
+        return res.json();
+      },
+
+      // Hint about a graded attempt (submission_id) or about the code currently in the editor
+      // (challenge_id + code, no submit needed). hint_level is 1-3 and only used for editor hints.
+      async getHint({ submission_id, challenge_id, learner_id, code, hint_level = 1 }) {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 600));
+          const idx = Math.min(hint_level, 3) - 1;
+          const ladder = mockCodeHintLadder(code || "", challenge_id) || MOCK_HINTS_LAST_K;
+          return { hint_number: idx + 1, hint: ladder[idx], hints_total: 3, hints_remaining: 2 - idx, exhausted: idx >= 2 };
+        }
+        const body = submission_id ? { submission_id, learner_id } : { challenge_id, learner_id, code, hint_level };
+        const res = await fetch(`${CONFIG.API_BASE}/api/hint`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(body)
+        });
+        await ensureOk(res, "Could not fetch a hint");
+        return res.json();
+      },
+
+      // Live hints: the whole Nudge/Pointer/Approach ladder for the code in the editor, computed by static analysis
+      // (no AI call, no sandbox), so it is cheap enough to refresh as you type.
+      async getLiveHints({ challenge_id, code, visible_outcomes }) {
+        if (CONFIG.USE_MOCK) {
+          const found = mockCodeFindings(code || "", challenge_id);
+          return { ladder: found.length ? found[0].ladder : [], focus: found.length ? found[0].kind : "clean", notes: found.slice(1, 4).map((f) => f.ladder[1]) };
+        }
+        const body = { challenge_id, code, all_levels: true };
+        if (visible_outcomes && visible_outcomes.length) body.visible_outcomes = visible_outcomes;
+        const res = await fetch(`${CONFIG.API_BASE}/api/hint`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(body)
+        });
+        await ensureOk(res, "Could not analyse your code");
+        return res.json();
+      },
+
+      async getLearner(id) {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 400));
+          return { ...MOCK_LEARNER, learner_id: id || MOCK_LEARNER.learner_id };
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/learner/${id}`, { headers: authHeaders() });
+        await ensureOk(res, "Could not load learner profile");
+        return res.json();
+      },
+
+      async history(learner_id) {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 400));
+          return MOCK_HISTORY;
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/learner/${learner_id}/history`, { headers: authHeaders() });
+        await ensureOk(res, "Could not load history");
+        return res.json();
+      },
+
+      async getChallengeSubmissions(learner_id, challenge_id) {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 300));
+          return MOCK_HISTORY.filter(h => !challenge_id || h.challenge_id === challenge_id);
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/learner/${learner_id}/history?challenge_id=${challenge_id}`, { headers: authHeaders() });
+        if (!res.ok) return [];
+        return res.json();
+      },
+
+      async getSubmission(submission_id) {
+        if (CONFIG.USE_MOCK) {
+          await new Promise(r => setTimeout(r, 250));
+          return {
+            submission_id,
+            id: submission_id,
+            challenge_id: "last-k-total",
+            code: "def last_k_total(marks, k):\n    # Historical attempt\n    start = len(marks) - k\n    return sum(marks[start:])\n",
+            all_passed: false,
+            created_at: "Earlier today"
+          };
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/submissions/${submission_id}`, { headers: authHeaders() });
+        if (!res.ok) throw new Error("Could not load submission code");
+        return res.json();
+      },
+
+      async getDraft(learner_id, challenge_id) {
+        if (CONFIG.USE_MOCK) {
+          return "def last_k_total(marks, k):\n    # Try experimenting: len(marks) - k or max(0, len(marks) - k)\n    start = len(marks) - k\n    return sum(marks[start:])\n";
+        }
+        const res = await fetch(`${CONFIG.API_BASE}/api/drafts/${learner_id}/${challenge_id}`, { headers: authHeaders() });
+        await ensureOk(res, "Could not load draft");
+        const draft = await res.json().catch(() => null);
+        return draft && typeof draft.code === "string" ? draft.code : "";
+      },
+
+      async saveDraft(learner_id, challenge_id, code) {
+        return true;
+      }
+    };
+
+    // --- CONTEXT (Learner identity in React state, theme in React state) ---
+    const DojoContext = createContext(null);
+
+    // ======================================================================
+    // ILLUSTRATION PRIMITIVES (original SVG art — colours come from CSS vars
+    // in assets/sakura.css, so every illustration re-themes for day/night)
+    // ======================================================================
+
+    // Small seeded PRNG so generated blossoms are identical on every render.
+    function mulberry32(seed) {
+      let a = seed;
+      return function () {
+        a |= 0; a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // Point on a cubic bezier given as [x0,y0,c1x,c1y,c2x,c2y,x1,y1]
+    function bezierPoint(p, t) {
+      const u = 1 - t;
+      return [
+        u * u * u * p[0] + 3 * u * u * t * p[2] + 3 * u * t * t * p[4] + t * t * t * p[6],
+        u * u * u * p[1] + 3 * u * u * t * p[3] + 3 * u * t * t * p[5] + t * t * t * p[7],
+      ];
+    }
+
+    const BRANCH_PATHS = [
+      { p: [520, 6, 440, 34, 380, 96, 296, 150], w: 8 },
+      { p: [452, 36, 420, 10, 372, 22, 322, 6], w: 4 },
+      { p: [404, 84, 438, 138, 424, 206, 388, 262], w: 4 },
+      { p: [360, 118, 330, 86, 276, 84, 236, 50], w: 3 },
+      { p: [296, 150, 262, 176, 226, 170, 186, 206], w: 3.5 },
+      { p: [490, 22, 506, 76, 504, 134, 478, 196], w: 3.5 },
+      { p: [330, 136, 350, 176, 340, 224, 312, 262], w: 2.5 },
+      { p: [236, 50, 214, 38, 190, 42, 168, 28], w: 2 },
+      { p: [186, 206, 168, 222, 150, 222, 128, 244], w: 2.5 },
+      { p: [388, 262, 376, 290, 360, 306, 340, 322], w: 2 },
+      { p: [478, 196, 470, 226, 452, 246, 436, 262], w: 2 },
+    ];
+
+    // Paths that arch up from the bottom corners of the scene footer
+    const SCENE_BRANCH_LEFT = [
+      { p: [-10, 372, 30, 300, 40, 230, 120, 170], w: 7 },
+      { p: [60, 268, 100, 262, 150, 280, 200, 262], w: 3.5 },
+      { p: [40, 308, 10, 290, -10, 280, -20, 250], w: 3 },
+      { p: [88, 214, 70, 184, 76, 150, 100, 124], w: 3 },
+    ];
+    const SCENE_BRANCH_RIGHT = [
+      { p: [1450, 372, 1410, 300, 1400, 240, 1330, 190], w: 7 },
+      { p: [1390, 276, 1350, 268, 1296, 288, 1250, 272], w: 3.5 },
+      { p: [1410, 316, 1440, 300, 1456, 286, 1462, 260], w: 3 },
+      { p: [1356, 224, 1372, 196, 1366, 166, 1340, 140], w: 3 },
+    ];
+
+    // <BlossomDefs>: one reusable five-petal blossom + gradient (referenced with <use>)
+    function BlossomDefs({ idp }) {
+      const stamens = [0, 1, 2, 3, 4, 5, 6].map((i) => {
+        const a = (i / 7) * Math.PI * 2;
+        return [Math.cos(a) * 5.5, Math.sin(a) * 5.5];
+      });
+      return (
+        <defs>
+          <radialGradient id={`${idp}-g`} cx="0" cy="0" r="17" gradientUnits="userSpaceOnUse">
+            <stop offset="0" style={{ stopColor: "var(--petal-core)" }} />
+            <stop offset="0.38" style={{ stopColor: "var(--petal-2)" }} />
+            <stop offset="1" style={{ stopColor: "var(--petal-1)" }} />
+          </radialGradient>
+          <g id={`${idp}-b`}>
+            {[0, 72, 144, 216, 288].map((a) => (
+              <path
+                key={a}
+                transform={`rotate(${a})`}
+                d="M0 0C-7 -3 -9.5 -13 -2.6 -16.5L0 -14.2L2.6 -16.5C9.5 -13 7 -3 0 0Z"
+                fill={`url(#${idp}-g)`}
+              />
+            ))}
+            {stamens.map(([x, y], i) => (
+              <g key={i}>
+                <line x1="0" y1="0" x2={x} y2={y} stroke="var(--petal-core)" strokeWidth="0.6" />
+                <circle cx={x} cy={y} r="0.9" fill="var(--petal-core)" />
+              </g>
+            ))}
+            <circle r="2" fill="var(--petal-core)" />
+          </g>
+        </defs>
+      );
+    }
+
+    // <BranchGroup>: brown bezier branches studded with blossoms and buds
+    function BranchGroup({ paths, seed = 7, idp, density = 1 }) {
+      const items = useMemo(() => {
+        const rand = mulberry32(seed);
+        const out = [];
+        paths.forEach(({ p, w }) => {
+          const count = Math.round((w * 2.4 + 3) * density);
+          for (let i = 0; i < count; i++) {
+            const t = 0.12 + (i / count) * 0.88 + (rand() - 0.5) * 0.06;
+            const [x, y] = bezierPoint(p, Math.min(t, 1));
+            const off = (rand() - 0.5) * 30;
+            out.push({
+              x: x + off * 0.7,
+              y: y + off,
+              r: Math.round(rand() * 360),
+              s: 0.55 + rand() * 0.8,
+              o: 0.72 + rand() * 0.28,
+              bud: rand() < 0.14,
+            });
+          }
+          // a cluster at every branch tip
+          const [tx, ty] = bezierPoint(p, 1);
+          for (let k = 0; k < 3; k++) {
+            out.push({ x: tx + (rand() - 0.5) * 22, y: ty + (rand() - 0.5) * 22, r: Math.round(rand() * 360), s: 0.7 + rand() * 0.6, o: 1, bud: false });
+          }
+        });
+        return out;
+      }, [paths, seed, density]);
+
+      return (
+        <g>
+          {paths.map(({ p, w }, i) => (
+            <path
+              key={i}
+              d={`M${p[0]} ${p[1]}C${p[2]} ${p[3]} ${p[4]} ${p[5]} ${p[6]} ${p[7]}`}
+              fill="none"
+              stroke="var(--branch)"
+              strokeWidth={w}
+              strokeLinecap="round"
+            />
+          ))}
+          {items.map((it, i) =>
+            it.bud ? (
+              <ellipse key={i} cx={it.x} cy={it.y} rx={3.4 * it.s} ry={4.6 * it.s} fill="var(--petal-2)" transform={`rotate(${it.r} ${it.x} ${it.y})`} />
+            ) : (
+              <use key={i} href={`#${idp}-b`} transform={`translate(${it.x} ${it.y}) rotate(${it.r}) scale(${it.s})`} opacity={it.o} />
+            )
+          )}
+        </g>
+      );
+    }
+
+    // <SakuraBranch>: a blossoming branch that reaches in from a top corner
+    function SakuraBranch({ seed = 11, idp = "br" }) {
+      return (
+        <svg viewBox="0 0 520 340" aria-hidden="true" focusable="false">
+          <BlossomDefs idp={idp} />
+          <BranchGroup paths={BRANCH_PATHS} seed={seed} idp={idp} />
+        </svg>
+      );
+    }
+
+    // <Lantern>: paper chochin lantern with a kanji, swaying gently and glowing amber
+    function Lantern({ char = "道", size = 44, delay = 0, hang = 26 }) {
+      const w = size;
+      const h = Math.round(size * 1.32);
+      return (
+        <div className="lantern" style={{ animationDelay: `${delay}s` }} aria-hidden="true">
+          <svg width={w} height={h + hang + 14} viewBox={`0 0 ${w} ${h + hang + 14}`}>
+            <defs>
+              <radialGradient id={`lg-${char}-${size}`} cx="50%" cy="45%" r="60%">
+                <stop offset="0" stopColor="#ffe9a8" />
+                <stop offset="0.55" stopColor="#ffb547" />
+                <stop offset="1" stopColor="#e2701f" />
+              </radialGradient>
+            </defs>
+            <line x1={w / 2} y1="0" x2={w / 2} y2={hang} stroke="var(--branch)" strokeWidth="1.5" />
+            <g className="lantern-body" transform={`translate(0 ${hang})`}>
+              <rect x={w * 0.24} y="0" width={w * 0.52} height="6" rx="2" fill="#3a2230" />
+              <ellipse cx={w / 2} cy={h / 2 + 3} rx={w / 2 - 1} ry={h / 2 - 3} fill={`url(#lg-${char}-${size})`} />
+              {[0.28, 0.5, 0.72].map((f, i) => (
+                <path key={i} d={`M${w * 0.07} ${h * f + 3} Q${w / 2} ${h * f + 9} ${w * 0.93} ${h * f + 3}`} fill="none" stroke="#c45a1a" strokeOpacity="0.55" strokeWidth="1" />
+              ))}
+              <rect x={w * 0.24} y={h - 3} width={w * 0.52} height="6" rx="2" fill="#3a2230" />
+              <text x={w / 2} y={h / 2 + 10} textAnchor="middle" fontFamily="'Shippori Mincho', serif" fontWeight="700" fontSize={size * 0.46} fill="#3a1d1d">{char}</text>
+              <line x1={w / 2} y1={h + 3} x2={w / 2} y2={h + 13} stroke="#c8322b" strokeWidth="2" strokeLinecap="round" />
+            </g>
+          </svg>
+        </div>
+      );
+    }
+
+    // <ToriiScene>: Fuji, layered ridges, torii gate, lanterns and blossoming corners (page footer art)
+    function ToriiScene() {
+      const stars = useMemo(() => {
+        const rand = mulberry32(42);
+        return Array.from({ length: 34 }, () => ({ x: rand() * 1440, y: rand() * 150, r: 0.6 + rand() * 1.4 }));
+      }, []);
+      return (
+        <div className="scene" aria-hidden="true">
+          <svg viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" focusable="false">
+            <BlossomDefs idp="sc" />
+            <defs>
+              <radialGradient id="sc-glow" cx="50%" cy="50%" r="50%">
+                <stop offset="0" stopColor="#ffc15a" stopOpacity="0.85" />
+                <stop offset="1" stopColor="#ffc15a" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+
+            {/* night sky extras (hidden by CSS in day mode) */}
+            <g className="stars">
+              {stars.map((s, i) => <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff4e0" opacity="0.8" />)}
+            </g>
+            <g className="moon">
+              <circle cx="1130" cy="74" r="42" fill="#fff1c9" opacity="0.14" />
+              <circle cx="1130" cy="74" r="25" fill="#fff4d6" />
+            </g>
+
+            {/* distant ridges */}
+            <path d="M0 252C120 208 210 236 330 212S530 176 650 220S900 196 1040 218S1300 184 1440 228V360H0Z" fill="var(--ridge-1)" opacity="0.85" />
+            <path d="M0 282C150 246 280 276 430 258S640 246 760 268S1040 238 1180 262S1360 250 1440 270V360H0Z" fill="var(--ridge-2)" />
+
+            {/* Mount Fuji */}
+            <path d="M462 322C556 304 618 232 668 190C690 172 702 168 720 168C738 168 750 172 772 190C822 232 884 304 978 322Z" fill="var(--fuji)" />
+            <path d="M720 168C738 168 750 172 772 190C822 232 884 304 978 322H808C798 262 766 212 720 168Z" fill="var(--fuji-shade)" opacity="0.7" />
+            <path d="M668 190C690 172 702 168 720 168C738 168 750 172 772 190L761 201L749 192L737 208L722 194L707 211L695 196L681 206Z" fill="var(--snow)" />
+
+            {/* foreground pink hills + dark ground */}
+            <path d="M0 316C140 292 280 312 430 304S640 296 720 308S1000 296 1140 306S1340 296 1440 312V360H0Z" fill="var(--ridge-3)" />
+            <path d="M0 336C220 318 450 326 720 330S1230 318 1440 334V360H0Z" fill="var(--hill)" />
+
+            {/* torii gate */}
+            <g>
+              <rect x="664" y="262" width="15" height="84" fill="var(--torii)" />
+              <rect x="761" y="262" width="15" height="84" fill="var(--torii)" />
+              <rect x="660" y="340" width="23" height="8" rx="2" fill="var(--torii-dark)" />
+              <rect x="757" y="340" width="23" height="8" rx="2" fill="var(--torii-dark)" />
+              <rect x="646" y="288" width="148" height="9" rx="1.5" fill="var(--torii)" />
+              <path d="M618 250Q720 232 822 250L820 256Q720 239 620 256Z" fill="var(--gold)" />
+              <path d="M628 256Q720 242 812 256L808 270Q720 258 632 270Z" fill="var(--torii)" />
+              <rect x="711" y="269" width="18" height="19" rx="2" fill="var(--gold)" />
+              <path d="M628 256Q720 242 812 256" fill="none" stroke="var(--torii-dark)" strokeOpacity="0.4" strokeWidth="1.2" />
+            </g>
+
+            {/* hanging lanterns beside the gate */}
+            {[640, 800].map((x, i) => (
+              <g key={x}>
+                <circle className="lantern-glow" cx={x} cy="298" r="34" fill="url(#sc-glow)" />
+                <line x1={x} y1="268" x2={x} y2="282" stroke="var(--torii-dark)" strokeWidth="1.2" />
+                <ellipse cx={x} cy="297" rx="11" ry="15" fill="#ffb547" />
+                <rect x={x - 6} y="280" width="12" height="3.5" rx="1" fill="#3a2230" />
+                <rect x={x - 6} y="310.5" width="12" height="3.5" rx="1" fill="#3a2230" />
+                <circle cx={x} cy="297" r="4.4" fill="#e2701f" opacity="0.85" />
+              </g>
+            ))}
+
+            {/* blossoming corner branches */}
+            <BranchGroup paths={SCENE_BRANCH_LEFT} seed={3} idp="sc" density={1.15} />
+            <BranchGroup paths={SCENE_BRANCH_RIGHT} seed={9} idp="sc" density={1.15} />
+          </svg>
+        </div>
+      );
+    }
+
+    // <PetalLayer>: petals drifting down the whole page (pure CSS animation). `density` (0-100) sets how many
+    // of the 72 pre-generated petals are shown; `speed` (percent, 100 = 1x) scales the fall speed.
+    const MAX_PETALS = 72;
+    function PetalLayer({ density = 70, speed = 100 }) {
+      const petals = useMemo(() => {
+        const rand = mulberry32(2026);
+        return Array.from({ length: MAX_PETALS }, () => ({
+          x: `${Math.round(rand() * 100)}%`,
+          size: `${Math.round(9 + rand() * 14)}px`,
+          dur: `${(6 + rand() * 6).toFixed(1)}s`,
+          delay: `-${(rand() * 12).toFixed(1)}s`,
+          drift: `${Math.round((rand() < 0.5 ? -1 : 1) * (60 + rand() * 180))}px`,
+          spin: `${Math.round(240 + rand() * 520)}deg`,
+        }));
+      }, []);
+      const count = Math.round((MAX_PETALS * density) / 100);
+      return (
+        <div className="petal-layer" aria-hidden="true" style={{ "--speed": speed / 100 }}>
+          {petals.slice(0, count).map((p, i) => (
+            <span key={i} className="petal" style={{ "--x": p.x, "--size": p.size, "--dur": p.dur, "--delay": p.delay, "--drift": p.drift, "--spin": p.spin }} />
+          ))}
+        </div>
+      );
+    }
+
+    // --- REUSABLE PRIMITIVES ---
+
+    // <Seal>: vermilion hanko stamp with a character (animated variant scale 1.6 -> 1)
+    function Seal({ char = "道", animated = false, size = "md", className = "" }) {
+      const sizes = {
+        sm: { w: 28, fs: 13 },
+        md: { w: 36, fs: 17 },
+        lg: { w: 48, fs: 24 },
+        xl: { w: 72, fs: 38 },
+      };
+      const s = sizes[size] || sizes.md;
+      return (
+        <div
+          className={`seal-stamp ${animated ? "animate-stamp" : ""} ${className}`}
+          style={{ width: s.w, height: s.w, fontSize: s.fs, fontWeight: 700, transform: animated ? undefined : "rotate(-3deg)" }}
+          title="Dojo Seal"
+        >
+          <span>{char}</span>
+        </div>
+      );
+    }
+
+    // <RuleHeading>: Heading with a brush-stroke underline that draws itself on mount
+    function RuleHeading({ title, subtitle, level = 2, className = "" }) {
+      const Tag = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
+      const sizing = level === 1 ? "text-3xl md:text-5xl" : level === 2 ? "text-2xl md:text-4xl" : "text-xl md:text-2xl";
+      return (
+        <div className={`mb-6 ${className}`}>
+          <div className="relative inline-block max-w-full">
+            <Tag className={`font-serif font-bold tracking-tight text-ink text-balance ${sizing}`}>{title}</Tag>
+            <svg className="w-full h-3 mt-1 overflow-visible block" viewBox="0 0 240 12" preserveAspectRatio="none" fill="none" aria-hidden="true">
+              <path d="M3 6.5C45 4.5 98 8.5 142 5.5C186 2.5 214 7 237 5.5" stroke="rgb(var(--blossom-rgb))" strokeWidth="3" strokeLinecap="round" className="draw-underline" />
+            </svg>
+          </div>
+          {subtitle && <p className="text-ink-soft text-base mt-2 font-normal max-w-2xl">{subtitle}</p>}
+        </div>
+      );
+    }
+
+    // <InkButton>: soft rounded button with hover lift + sheen (variants: primary, secondary, surface, pine)
+    function InkButton({ children, variant = "secondary", onClick, disabled, className = "", type = "button" }) {
+      const variantClasses = {
+        primary: "dojo-btn-primary",
+        secondary: "",
+        surface: "",
+        pine: "dojo-btn-pine",
+      };
+      return (
+        <button
+          type={type}
+          onClick={onClick}
+          disabled={disabled}
+          className={`dojo-btn ${variantClasses[variant] || ""} ${className}`}
+        >
+          {children}
+        </button>
+      );
+    }
+
+    // <PaperCard>: frosted-glass card; `interactive` cards lift on hover and are keyboard accessible
+    function PaperCard({ children, className = "", onClick, interactive = false, pad = "p-5 md:p-6", accent = false }) {
+      const handleKey = (e) => {
+        if (!interactive || !onClick) return;
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); }
+      };
+      return (
+        <div
+          onClick={onClick}
+          onKeyDown={handleKey}
+          role={interactive ? "button" : undefined}
+          tabIndex={interactive ? 0 : undefined}
+          className={`dojo-card ${pad} ${accent ? "dojo-card-accent" : ""} ${interactive ? "dojo-card-interactive" : ""} ${className}`}
+        >
+          {children}
+        </div>
+      );
+    }
+
+    // <OutcomeBadge>: HARD RULE - Only learner-facing labels: Passed, Wrong output, Runtime error, Timeout
+    function OutcomeBadge({ outcome, limit }) {
+      const config = {
+        passed: { label: "Passed", cls: "pill-pine" },
+        wrong_output: { label: "Wrong output", cls: "pill-ochre" },
+        runtime_error: { label: "Runtime error", cls: "pill-seal" },
+        timeout: { label: "Timeout", cls: "pill-indigo" },
+      };
+      const style = config[outcome] || { label: outcome, cls: "" };
+      return (
+        <span className={`pill ${style.cls}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+          {style.label} {limit ? `(${limit})` : ""}
+        </span>
+      );
+    }
+
+    // <Loader>: three bouncing petals
+    function Loader({ label = "Consulting scrolls..." }) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 gap-4" role="status" aria-live="polite">
+          <div className="flex items-end gap-2.5">
+            <span className="petal-dot" style={{ animationDelay: "0ms" }}></span>
+            <span className="petal-dot" style={{ animationDelay: "160ms" }}></span>
+            <span className="petal-dot" style={{ animationDelay: "320ms" }}></span>
+          </div>
+          <span className="text-sm font-mono text-ink-soft">{label}</span>
+        </div>
+      );
+    }
+
+    // <CountUp>: Big serif numerals for stats
+    function CountUp({ value, label, suffix = "" }) {
+      const [count, setCount] = useState(0);
+
+      useEffect(() => {
+        let start = 0;
+        const target = typeof value === 'number' ? value : parseInt(value, 10) || 0;
+        if (target === 0) {
+          setCount(0);
+          return;
+        }
+        const duration = 650;
+        const stepTime = 30;
+        const totalSteps = duration / stepTime;
+        const increment = target / totalSteps;
+
+        const timer = setInterval(() => {
+          start += increment;
+          if (start >= target) {
+            setCount(target);
+            clearInterval(timer);
+          } else {
+            setCount(Math.floor(start));
+          }
+        }, stepTime);
+
+        return () => clearInterval(timer);
+      }, [value]);
+
+      return (
+        <div className="flex flex-col">
+          <span className="font-serif text-4xl md:text-5xl font-bold text-ink tracking-tight leading-none">
+            {count}{suffix}
+          </span>
+          {label && (
+            <span className="text-[11px] uppercase tracking-[0.12em] font-mono text-ink-soft mt-2">
+              {label}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    // <Reveal>: scroll-triggered entrance — children rise in when they enter the viewport, offset by `delay` ms
+    function Reveal({ children, delay = 0, className = "" }) {
+      const ref = useRef(null);
+      const [shown, setShown] = useState(false);
+      useEffect(() => {
+        const el = ref.current;
+        const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (!el || reduced || !("IntersectionObserver" in window)) { setShown(true); return; }
+        const io = new IntersectionObserver(
+          (entries) => { if (entries.some((e) => e.isIntersecting)) { setShown(true); io.disconnect(); } },
+          { threshold: 0.1, rootMargin: "0px 0px -6% 0px" }
+        );
+        io.observe(el);
+        return () => io.disconnect();
+      }, []);
+      return (
+        <div ref={ref} className={`reveal ${shown ? "in-view" : ""} ${className}`} style={{ "--d": `${delay}ms` }}>
+          {children}
+        </div>
+      );
+    }
+
+    // <CodeMirrorEditor>: CodeMirror 5 with Python mode, 4-space indent, fallback to textarea
+    function CodeMirrorEditor({ value, onChange, onRun, onSubmit, onEsc, readOnly = false, refreshKey = null }) {
+      const containerRef = useRef(null);
+      const cmRef = useRef(null);
+      const [hasCM, setHasCM] = useState(true);
+
+      const onRunRef = useRef(onRun);
+      const onSubmitRef = useRef(onSubmit);
+      const onChangeRef = useRef(onChange);
+      const onEscRef = useRef(onEsc);
+
+      useEffect(() => { onRunRef.current = onRun; }, [onRun]);
+      useEffect(() => { onSubmitRef.current = onSubmit; }, [onSubmit]);
+      useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+      useEffect(() => { onEscRef.current = onEsc; }, [onEsc]);
+
+      useEffect(() => {
+        if (!window.CodeMirror || !containerRef.current) {
+          setHasCM(false);
+          return;
+        }
+
+        try {
+          const extraKeys = {
+            "Tab": function(cm) {
+              if (cm.somethingSelected()) {
+                cm.indentSelection("add");
+              } else {
+                cm.replaceSelection("    ", "end");
+              }
+            },
+            "Esc": function(cm) {
+              if (onEscRef.current) {
+                onEscRef.current();
+              } else {
+                cm.display.input.blur();
+              }
+            },
+            "Ctrl-Enter": function() {
+              if (onRunRef.current) onRunRef.current();
+            },
+            "Cmd-Enter": function() {
+              if (onRunRef.current) onRunRef.current();
+            },
+            "Ctrl-Shift-Enter": function() {
+              if (onSubmitRef.current) onSubmitRef.current();
+            },
+            "Cmd-Shift-Enter": function() {
+              if (onSubmitRef.current) onSubmitRef.current();
+            }
+          };
+
+          const cm = window.CodeMirror(containerRef.current, {
+            value: value || "",
+            mode: "python",
+            lineNumbers: true,
+            tabSize: 4,
+            indentUnit: 4,
+            indentWithTabs: false,
+            readOnly: readOnly,
+            lineWrapping: true,
+            extraKeys: extraKeys
+          });
+
+          cm.on("change", (instance, changeObj) => {
+            if (changeObj.origin !== "setValue") {
+              const val = instance.getValue();
+              if (onChangeRef.current) {
+                onChangeRef.current(val);
+              }
+            }
+          });
+
+          cmRef.current = cm;
+
+          setTimeout(() => {
+            if (cmRef.current) cmRef.current.refresh();
+          }, 50);
+
+          return () => {
+            const wrapper = cm.getWrapperElement();
+            if (wrapper && wrapper.parentNode) {
+              wrapper.parentNode.removeChild(wrapper);
+            }
+            cmRef.current = null;
+          };
+        } catch (e) {
+          console.warn("CodeMirror init failed, falling back to textarea", e);
+          setHasCM(false);
+        }
+      }, []);
+
+      useEffect(() => {
+        if (cmRef.current && value !== cmRef.current.getValue()) {
+          const cursor = cmRef.current.getCursor();
+          cmRef.current.setValue(value || "");
+          try {
+            cmRef.current.setCursor(cursor);
+          } catch (_) {}
+        }
+      }, [value]);
+
+      useEffect(() => {
+        if (cmRef.current) {
+          cmRef.current.setOption("readOnly", readOnly);
+          cmRef.current.refresh();
+        }
+      }, [readOnly]);
+
+      useEffect(() => {
+        if (cmRef.current) {
+          cmRef.current.refresh();
+        }
+      }, [refreshKey]);
+
+      if (!hasCM) {
+        return (
+          <textarea
+            value={value}
+            onChange={(e) => onChange && onChange(e.target.value)}
+            readOnly={readOnly}
+            rows={readOnly ? 8 : 12}
+            className="code-area"
+            spellCheck="false"
+            aria-label="Python code editor"
+          />
+        );
+      }
+
+      return (
+        <div
+          ref={containerRef}
+          className="cm-host w-full"
+          style={{ minHeight: readOnly ? "180px" : "260px" }}
+        />
+      );
+    }
+
+    // ErrorBanner: Friendly error display, never raw errors
+    function ErrorBanner({ message, onDismiss }) {
+      if (!message) return null;
+      return (
+        <div role="alert" className="dojo-card dojo-card-accent text-ink px-4 py-3 mb-4 flex items-center justify-between gap-3 text-sm" style={{ borderColor: "rgb(var(--seal-rgb) / .5)" }}>
+          <div className="flex items-center gap-2">
+            <span className="text-seal font-bold">●</span>
+            <span>{message}</span>
+          </div>
+          {onDismiss && (
+            <button onClick={onDismiss} className="text-xs underline text-seal font-mono">
+              Dismiss
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // <Eyebrow>: tiny uppercase section label
+    function Eyebrow({ children, dot = false, className = "" }) {
+      return (
+        <span className={`eyebrow inline-flex items-center gap-2 ${className}`}>
+          {dot && <span className="w-1.5 h-1.5 rounded-full bg-seal"></span>}
+          {children}
+        </span>
+      );
+    }
+
+    function greeting() {
+      const h = new Date().getHours();
+      return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    }
+
+    // ======================================================================
+    // ATMOSPHERE, MOTION & INTERACTION
+    // ======================================================================
+    const AMBIENCE_KEY = "debugdojo_ambience";
+    const AMBIENCE_DEFAULT = { density: 70, speed: 100, trail: true };
+
+    function usePrefersReducedMotion() {
+      return useMemo(
+        () => typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        []
+      );
+    }
+
+    // Writes --scroll-y / --scroll-p on <html> so CSS can drive parallax, the progress bar and header state.
+    function useScrollEffects() {
+      useEffect(() => {
+        const root = document.documentElement;
+        let raf = 0;
+        const update = () => {
+          raf = 0;
+          const y = window.scrollY || 0;
+          const max = Math.max(1, root.scrollHeight - window.innerHeight);
+          root.style.setProperty("--scroll-y", String(Math.round(y)));
+          root.style.setProperty("--scroll-p", Math.min(1, y / max).toFixed(4));
+          root.dataset.scrolled = y > 12 ? "1" : "0";
+        };
+        const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+        update();
+        window.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onScroll);
+        return () => {
+          window.removeEventListener("scroll", onScroll);
+          window.removeEventListener("resize", onScroll);
+          if (raf) cancelAnimationFrame(raf);
+        };
+      }, []);
+    }
+
+    // Pointer effects (fine pointers only): card spotlight + tilt, magnetic primary buttons, background parallax.
+    function useMouseEffects(enabled) {
+      useEffect(() => {
+        if (!enabled || !window.matchMedia || !window.matchMedia("(pointer: fine)").matches) return;
+        const root = document.documentElement;
+        let raf = 0, ev = null, lastCard = null, lastBtn = null;
+        const clear = (el, props) => { if (el) props.forEach((p) => el.style.removeProperty(p)); };
+        const apply = () => {
+          raf = 0;
+          if (!ev) return;
+          root.style.setProperty("--px", ((ev.clientX / window.innerWidth) * 2 - 1).toFixed(3));
+          root.style.setProperty("--py", ((ev.clientY / window.innerHeight) * 2 - 1).toFixed(3));
+          const t = ev.target instanceof Element ? ev.target : null;
+          const card = t && t.closest(".dojo-card");
+          if (lastCard && lastCard !== card) clear(lastCard, ["--mx", "--my", "--rx", "--ry"]);
+          if (card) {
+            const r = card.getBoundingClientRect();
+            const x = ev.clientX - r.left, y = ev.clientY - r.top;
+            card.style.setProperty("--mx", `${x}px`);
+            card.style.setProperty("--my", `${y}px`);
+            if (card.classList.contains("dojo-card-interactive")) {
+              card.style.setProperty("--rx", `${((y / r.height - 0.5) * -6).toFixed(2)}deg`);
+              card.style.setProperty("--ry", `${((x / r.width - 0.5) * 6).toFixed(2)}deg`);
+            }
+          }
+          lastCard = card;
+          const btn = t && t.closest(".dojo-btn-primary");
+          if (lastBtn && lastBtn !== btn) clear(lastBtn, ["--bx", "--by"]);
+          if (btn && !btn.disabled) {
+            const r = btn.getBoundingClientRect();
+            btn.style.setProperty("--bx", `${((ev.clientX - (r.left + r.width / 2)) * 0.12).toFixed(1)}px`);
+            btn.style.setProperty("--by", `${((ev.clientY - (r.top + r.height / 2)) * 0.2).toFixed(1)}px`);
+          }
+          lastBtn = btn;
+        };
+        const onMove = (e) => { ev = e; if (!raf) raf = requestAnimationFrame(apply); };
+        const onLeave = () => {
+          clear(lastCard, ["--mx", "--my", "--rx", "--ry"]);
+          clear(lastBtn, ["--bx", "--by"]);
+          lastCard = lastBtn = null;
+          root.style.setProperty("--px", "0");
+          root.style.setProperty("--py", "0");
+        };
+        window.addEventListener("pointermove", onMove, { passive: true });
+        document.documentElement.addEventListener("mouseleave", onLeave);
+        return () => {
+          window.removeEventListener("pointermove", onMove);
+          document.documentElement.removeEventListener("mouseleave", onLeave);
+          onLeave();
+          if (raf) cancelAnimationFrame(raf);
+        };
+      }, [enabled]);
+    }
+
+    // <CursorPetals>: sakura petals trail the mouse and burst on click (canvas, only runs while petals are alive)
+    function CursorPetals({ enabled }) {
+      const canvasRef = useRef(null);
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!enabled || !canvas || !window.matchMedia || !window.matchMedia("(pointer: fine)").matches) return;
+        const ctx = canvas.getContext("2d");
+        const colors = ["#ffd3dd", "#f6a3b8", "#f08fab", "#ffe3ea"];
+        const parts = [];
+        let w = 0, h = 0, raf = 0, lx = null, ly = null, acc = 0;
+        const resize = () => {
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          w = window.innerWidth; h = window.innerHeight;
+          canvas.width = w * dpr; canvas.height = h * dpr;
+          canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+        const spawn = (x, y, burst) => {
+          const a = Math.random() * Math.PI * 2;
+          const sp = burst ? 1.5 + Math.random() * 3.6 : 0.2 + Math.random() * 0.8;
+          parts.push({
+            x, y,
+            vx: Math.cos(a) * sp + (burst ? 0 : (Math.random() - 0.5) * 0.6),
+            vy: Math.sin(a) * sp + (burst ? -1 : 0.3),
+            rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.22,
+            s: 6 + Math.random() * 7, life: 1, decay: burst ? 0.016 : 0.012,
+            c: colors[(Math.random() * colors.length) | 0],
+          });
+          if (parts.length > 160) parts.shift();
+        };
+        const draw = () => {
+          raf = 0;
+          ctx.clearRect(0, 0, w, h);
+          for (let i = parts.length - 1; i >= 0; i--) {
+            const p = parts[i];
+            p.x += p.vx; p.y += p.vy; p.vy += 0.035; p.vx *= 0.985; p.rot += p.vr; p.life -= p.decay;
+            if (p.life <= 0) { parts.splice(i, 1); continue; }
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.life) * 0.9;
+            ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(-p.s * 0.7, -p.s * 0.4, -p.s * 0.5, -p.s * 1.1, 0, -p.s);
+            ctx.bezierCurveTo(p.s * 0.5, -p.s * 1.1, p.s * 0.7, -p.s * 0.4, 0, 0);
+            ctx.fill();
+            ctx.restore();
+          }
+          if (parts.length) raf = requestAnimationFrame(draw);
+        };
+        const kick = () => { if (!raf) raf = requestAnimationFrame(draw); };
+        const onMove = (e) => {
+          if (e.pointerType && e.pointerType !== "mouse") return;
+          if (lx !== null) {
+            acc += Math.hypot(e.clientX - lx, e.clientY - ly);
+            if (acc > 34) { acc = 0; spawn(e.clientX, e.clientY, false); kick(); }
+          }
+          lx = e.clientX; ly = e.clientY;
+        };
+        const onDown = (e) => {
+          const t = e.target;
+          if (t instanceof Element && t.closest("input,textarea,select,.CodeMirror")) return;
+          for (let i = 0; i < 12; i++) spawn(e.clientX, e.clientY, true);
+          kick();
+        };
+        resize();
+        window.addEventListener("resize", resize);
+        window.addEventListener("pointermove", onMove, { passive: true });
+        window.addEventListener("pointerdown", onDown, { passive: true });
+        return () => {
+          window.removeEventListener("resize", resize);
+          window.removeEventListener("pointermove", onMove);
+          window.removeEventListener("pointerdown", onDown);
+          if (raf) cancelAnimationFrame(raf);
+          ctx.clearRect(0, 0, w, h);
+        };
+      }, [enabled]);
+      return <canvas ref={canvasRef} className="cursor-canvas" aria-hidden="true" />;
+    }
+
+    function ScrollProgress() {
+      return <div className="scroll-progress" aria-hidden="true"><span /></div>;
+    }
+
+    // <IntroSplash>: one-time (per tab) seal-stamp curtain when the app first opens
+    function IntroSplash() {
+      const reduced = usePrefersReducedMotion();
+      const [phase, setPhase] = useState(() => {
+        try { return sessionStorage.getItem("debugdojo_intro") ? "done" : "show"; } catch (e) { return "show"; }
+      });
+      useEffect(() => {
+        if (phase !== "show") return;
+        if (reduced) { setPhase("done"); return; }
+        try { sessionStorage.setItem("debugdojo_intro", "1"); } catch (e) {}
+        const t1 = setTimeout(() => setPhase("leave"), 1100);
+        const t2 = setTimeout(() => setPhase("done"), 1750);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
+      }, []);
+      if (phase === "done") return null;
+      return (
+        <div className={`intro-splash ${phase === "leave" ? "is-leaving" : ""}`} aria-hidden="true">
+          <Seal char="道" size="xl" animated />
+          <div className="wordmark text-4xl mt-5 text-ink">Debug Dojo</div>
+          <div className="eyebrow mt-2">道場 · unrolling the scrolls</div>
+        </div>
+      );
+    }
+
+    // <TeamCredit>: fixed bottom-right project credit
+    function TeamCredit() {
+      return (
+        <div className="team-credit" aria-label="Project by Team Brahmansh">
+          <span className="seal-stamp" style={{ width: 22, height: 22, fontSize: 12, fontWeight: 700, transform: "rotate(-4deg)" }}>桜</span>
+          <span>Project by Team : Brahmansh</span>
+        </div>
+      );
+    }
+
+    // <AmbiencePanel>: header popover with range sliders for petal count / wind speed and a cursor-petal switch
+    function AmbiencePanel() {
+      const { ambience, setAmbience } = useContext(DojoContext);
+      const [open, setOpen] = useState(false);
+      const ref = useRef(null);
+      useEffect(() => {
+        if (!open) return;
+        const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+        document.addEventListener("pointerdown", onDoc);
+        document.addEventListener("keydown", onKey);
+        return () => { document.removeEventListener("pointerdown", onDoc); document.removeEventListener("keydown", onKey); };
+      }, [open]);
+      const set = (patch) => setAmbience({ ...ambience, ...patch });
+      return (
+        <div className="relative" ref={ref}>
+          <button
+            className="dojo-btn dojo-btn-icon"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls="ambience-panel"
+            aria-label="Ambience settings"
+            title="Ambience: petals & wind"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 12C9 9 9 4.5 12 2c3 2.5 3 7 0 10Z" />
+              <path d="M12 12c3-3 7.5-3 10-0.2-2.2 3.2-6.8 3.3-10 0.2Z" />
+              <path d="M12 12c0 4.2-2.6 8-6.4 9.4-1.6-3.6-.2-8 3.4-9.9" />
+              <path d="M12 12C7.8 11.4 4.2 8.6 3 4.6c3.7-.8 7.6 1.2 9 7.4" />
+            </svg>
+          </button>
+          {open && (
+            <div id="ambience-panel" className="dojo-card ambience-panel p-5 space-y-4 page-enter" role="dialog" aria-label="Ambience settings">
+              <div className="eyebrow">Ambience</div>
+              <label className="block text-sm text-ink">
+                <span className="flex justify-between font-semibold"><span>Petals</span><span className="font-mono text-ink-soft">{ambience.density}%</span></span>
+                <input className="dojo-range" type="range" min="0" max="100" step="5" value={ambience.density} onChange={(e) => set({ density: Number(e.target.value) })} />
+              </label>
+              <label className="block text-sm text-ink">
+                <span className="flex justify-between font-semibold"><span>Wind speed</span><span className="font-mono text-ink-soft">{(ambience.speed / 100).toFixed(1)}×</span></span>
+                <input className="dojo-range" type="range" min="50" max="250" step="10" value={ambience.speed} onChange={(e) => set({ speed: Number(e.target.value) })} />
+              </label>
+              <label className="flex items-center justify-between gap-3 text-sm text-ink font-semibold cursor-pointer">
+                <span>Cursor petals</span>
+                <input type="checkbox" className="dojo-switch" checked={ambience.trail} onChange={(e) => set({ trail: e.target.checked })} />
+              </label>
+              <button className="text-xs font-mono underline text-ink-soft hover:text-ink" onClick={() => setAmbience(AMBIENCE_DEFAULT)}>Reset to default</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- <Slider>: swipe/drag carousel with arrows, dots, keyboard and optional autoplay ---
+    function useCols(spec) {
+      const pick = () => {
+        const w = window.innerWidth;
+        return w >= 1024 ? (spec.lg || spec.sm || spec.base || 1) : w >= 640 ? (spec.sm || spec.base || 1) : (spec.base || 1);
+      };
+      const [cols, setCols] = useState(pick);
+      useEffect(() => {
+        const onResize = () => setCols(pick());
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+      }, []);
+      return cols;
+    }
+
+    function Slider({ items, label, perView = { base: 1 }, autoplay = 0, className = "" }) {
+      const reduced = usePrefersReducedMotion();
+      const cols = useCols(perView);
+      const [index, setIndex] = useState(0);
+      const [paused, setPaused] = useState(false);
+      const [dragX, setDragX] = useState(0);
+      const drag = useRef({ active: false, startX: 0, moved: false });
+      const maxIndex = Math.max(0, items.length - cols);
+      const current = Math.min(index, maxIndex);
+      const go = (i) => setIndex(Math.max(0, Math.min(maxIndex, i)));
+
+      useEffect(() => {
+        if (!autoplay || reduced || paused || maxIndex === 0) return;
+        const t = setInterval(() => setIndex((i) => (i >= maxIndex ? 0 : i + 1)), autoplay);
+        return () => clearInterval(t);
+      }, [autoplay, reduced, paused, maxIndex]);
+
+      const onDown = (e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        drag.current = { active: true, startX: e.clientX, moved: false };
+      };
+      const onMove = (e) => {
+        const d = drag.current;
+        if (!d.active) return;
+        const dx = e.clientX - d.startX;
+        if (Math.abs(dx) > 6) d.moved = true;
+        if (d.moved) setDragX(dx);
+      };
+      const onUp = () => {
+        const d = drag.current;
+        if (!d.active) return;
+        d.active = false;
+        if (d.moved) {
+          if (Math.abs(dragX) > 60) go(current + (dragX < 0 ? 1 : -1));
+          setTimeout(() => { drag.current.moved = false; }, 0);
+        }
+        setDragX(0);
+      };
+      const onKeyDown = (e) => {
+        if (e.key === "ArrowRight") { e.preventDefault(); go(current + 1); }
+        if (e.key === "ArrowLeft") { e.preventDefault(); go(current - 1); }
+      };
+      const pages = maxIndex + 1;
+
+      return (
+        <div
+          className={`slider ${className}`}
+          role="region"
+          aria-roledescription="carousel"
+          aria-label={label}
+          tabIndex={0}
+          onKeyDown={onKeyDown}
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocus={() => setPaused(true)}
+          onBlur={() => setPaused(false)}
+        >
+          <div
+            className="slider-viewport"
+            onPointerDown={onDown}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerCancel={onUp}
+            onPointerLeave={onUp}
+            onClickCapture={(e) => { if (drag.current.moved) { e.preventDefault(); e.stopPropagation(); } }}
+          >
+            <div
+              className="slider-track"
+              style={{
+                transform: `translateX(calc(${(-current * 100) / cols}% + ${dragX}px))`,
+                transition: dragX ? "none" : undefined,
+              }}
+            >
+              {items.map((it, i) => (
+                <div
+                  key={it.key}
+                  className="slider-slide"
+                  style={{ flex: `0 0 ${100 / cols}%` }}
+                  role="group"
+                  aria-roledescription="slide"
+                  aria-label={`${i + 1} of ${items.length}`}
+                  aria-hidden={i < current || i >= current + cols ? "true" : undefined}
+                >
+                  {it.node}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {pages > 1 && (
+            <div className="slider-controls">
+              <button className="dojo-btn dojo-btn-icon" onClick={() => go(current - 1)} disabled={current === 0} aria-label="Previous slide">←</button>
+              <div className="slider-dots" role="tablist" aria-label="Choose slide">
+                {Array.from({ length: pages }, (_, i) => (
+                  <button key={i} role="tab" aria-selected={i === current} aria-label={`Go to slide ${i + 1}`} className={`slider-dot ${i === current ? "is-active" : ""}`} onClick={() => go(i)} />
+                ))}
+              </div>
+              <button className="dojo-btn dojo-btn-icon" onClick={() => go(current + 1)} disabled={current === maxIndex} aria-label="Next slide">→</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ======================================================================
+    // AUTH UI (nickname + PIN, Google, phone one-time code)
+    // ======================================================================
+    let googleScriptPromise = null;
+    function loadGoogleScript() {
+      if (window.google && window.google.accounts && window.google.accounts.id) return Promise.resolve();
+      if (!googleScriptPromise) {
+        googleScriptPromise = new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://accounts.google.com/gsi/client";
+          s.async = true; s.defer = true;
+          s.onload = () => resolve();
+          s.onerror = () => { googleScriptPromise = null; reject(new Error("Could not load Google sign-in.")); };
+          document.head.appendChild(s);
+        });
+      }
+      return googleScriptPromise;
+    }
+
+    function friendlyAuthError(err) {
+      if (err && err.status) return err.message;
+      return "Can't reach the dojo server. Is the backend running at " + CONFIG.API_BASE + "?";
+    }
+
+    function Field({ id, label, hint, error, children }) {
+      return (
+        <div>
+          <label htmlFor={id} className="block font-serif font-bold text-ink mb-2">{label}</label>
+          {children}
+          {(hint || error) && (
+            <p id={`${id}-help`} className={`text-xs mt-2 font-mono ${error ? "text-seal" : "text-ink-soft"}`}>{error || hint}</p>
+          )}
+        </div>
+      );
+    }
+
+    function NicknamePanel({ run, busy, onSignedIn, onGuest }) {
+      const { learnerId } = useContext(DojoContext);
+      const [mode, setMode] = useState("new");
+      const [name, setName] = useState("");
+      const [pin, setPin] = useState("");
+      const [fieldError, setFieldError] = useState("");
+
+      const submit = (e) => {
+        e.preventDefault();
+        setFieldError("");
+        if (mode === "new") {
+          const clean = name.trim();
+          if (!clean) { onGuest(); return; }
+          if (!/^[A-Za-z0-9 _-]{2,24}$/.test(clean)) { setFieldError("Use 2–24 letters, numbers, spaces, - or _."); return; }
+          if (pin && !/^\d{4,8}$/.test(pin)) { setFieldError("A PIN is 4 to 8 digits."); return; }
+          run(async () => onSignedIn(await authApi.register(clean, pin || undefined)));
+        } else {
+          const id = name.trim();
+          if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) { setFieldError("Enter your learner ID (letters, numbers, - or _)."); return; }
+          if (!/^\d{4,8}$/.test(pin)) { setFieldError("Enter your 4–8 digit PIN."); return; }
+          run(async () => onSignedIn(await authApi.login(id, pin)));
+        }
+      };
+
+      return (
+        <form onSubmit={submit} className="space-y-5" noValidate>
+          <Field
+            id="nickname"
+            label={mode === "new" ? "What should we call you?" : "Your learner ID"}
+            hint={mode === "new" ? "Your handle in the scroll archives and streak logs." : "The ID shown in the header when you signed up."}
+            error={fieldError}
+          >
+            <input
+              id="nickname" className="dojo-input" type="text" value={name} maxLength={mode === "new" ? 24 : 40}
+              onChange={(e) => setName(e.target.value)} autoComplete="username" aria-describedby="nickname-help"
+              placeholder={mode === "new" ? `e.g. ${learnerId}, kenshi, py_hunter` : "e.g. kenshi_1"}
+            />
+          </Field>
+          <Field id="pin" label={mode === "new" ? "Secret PIN (optional)" : "Secret PIN"} hint={mode === "new" ? "4–8 digits, so only you can open your progress." : undefined}>
+            <input
+              id="pin" className="dojo-input" type="password" inputMode="numeric" maxLength={8} value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              autoComplete={mode === "new" ? "new-password" : "current-password"} placeholder="••••"
+            />
+          </Field>
+          <InkButton type="submit" variant="primary" className="w-full !py-3 !text-base" disabled={busy}>
+            {busy ? "One moment…" : mode === "new" ? "Enter the dojo →" : "Sign in →"}
+          </InkButton>
+          <button type="button" className="text-sm font-semibold text-ink underline" onClick={() => { setMode(mode === "new" ? "returning" : "new"); setFieldError(""); setPin(""); }}>
+            {mode === "new" ? "I already have a PIN" : "Create a new profile instead"}
+          </button>
+        </form>
+      );
+    }
+
+    function GooglePanel({ providers, run, busy, onSignedIn }) {
+      const btnRef = useRef(null);
+      const [name, setName] = useState("");
+      const [state, setState] = useState("idle");
+      const handler = useRef(null);
+      handler.current = (credential) => run(async () => onSignedIn(await authApi.google(credential, name.trim())));
+      const enabled = !!(providers && providers.google && providers.google.enabled);
+
+      useEffect(() => {
+        if (!enabled) return;
+        let cancelled = false;
+        setState("loading");
+        loadGoogleScript()
+          .then(() => {
+            if (cancelled || !btnRef.current) return;
+            window.google.accounts.id.initialize({
+              client_id: providers.google.client_id,
+              callback: (resp) => handler.current && handler.current(resp.credential),
+            });
+            window.google.accounts.id.renderButton(btnRef.current, { theme: "outline", size: "large", shape: "pill", text: "continue_with", width: 300 });
+            setState("ready");
+          })
+          .catch(() => { if (!cancelled) setState("error"); });
+        return () => { cancelled = true; };
+      }, [enabled, providers]);
+
+      if (!providers) return <p className="text-sm text-ink-soft">Checking sign-in options…</p>;
+      if (!enabled) {
+        return (
+          <div className="dojo-inset p-4 text-sm space-y-2">
+            <p className="font-semibold text-ink">Google sign-in isn't set up on this server yet.</p>
+            <p className="text-ink-soft">Add a Google OAuth <span className="font-mono">GOOGLE_CLIENT_ID</span> to <span className="font-mono">backend/.env</span> and restart the backend to switch it on. Until then, use the Nickname or Phone tab.</p>
+          </div>
+        );
+      }
+      return (
+        <div className="space-y-4">
+          <Field id="g-name" label="Display name (new accounts)" hint="Optional. Your Google name and email are never stored.">
+            <input id="g-name" className="dojo-input" type="text" maxLength={24} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. kenshi" aria-describedby="g-name-help" />
+          </Field>
+          <div className={`google-slot ${busy ? "opacity-60 pointer-events-none" : ""}`} ref={btnRef} />
+          {state === "loading" && <p className="text-xs font-mono text-ink-soft">Loading Google…</p>}
+          {state === "error" && <p className="text-xs font-mono text-seal" role="alert">Could not load Google sign-in. Check your connection and try again.</p>}
+        </div>
+      );
+    }
+
+    function PhonePanel({ providers, run, busy, onSignedIn }) {
+      const [step, setStep] = useState("number");
+      const [phone, setPhone] = useState("+91 ");
+      const [code, setCode] = useState("");
+      const [name, setName] = useState("");
+      const [fieldError, setFieldError] = useState("");
+      const [cooldown, setCooldown] = useState(0);
+
+      useEffect(() => {
+        if (cooldown <= 0) return;
+        const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+        return () => clearTimeout(t);
+      }, [cooldown]);
+
+      const cleanPhone = () => phone.replace(/[\s\-().]/g, "");
+      const sendCode = (e) => {
+        if (e) e.preventDefault();
+        setFieldError("");
+        if (!/^\+[1-9]\d{7,14}$/.test(cleanPhone())) { setFieldError("Use international format, e.g. +919876543210."); return; }
+        run(async () => { await authApi.phoneRequest(cleanPhone()); setStep("code"); setCode(""); setCooldown(30); });
+      };
+      const verify = (e) => {
+        e.preventDefault();
+        setFieldError("");
+        if (!/^\d{6}$/.test(code)) { setFieldError("Enter the 6-digit code."); return; }
+        const nick = name.trim();
+        if (nick && !/^[A-Za-z0-9 _-]{2,24}$/.test(nick)) { setFieldError("Use 2–24 letters, numbers, spaces, - or _ for your name."); return; }
+        run(async () => onSignedIn(await authApi.phoneVerify(cleanPhone(), code, nick)));
+      };
+
+      const devMode = providers && providers.phone && providers.phone.dev_mode;
+
+      if (step === "number") {
+        return (
+          <form onSubmit={sendCode} className="space-y-5" noValidate>
+            <Field id="phone" label="Phone number" hint="We text you a 6-digit code. Only a one-way hash of your number is kept." error={fieldError}>
+              <input id="phone" className="dojo-input" type="tel" inputMode="tel" autoComplete="tel" value={phone} maxLength={20} onChange={(e) => setPhone(e.target.value)} aria-describedby="phone-help" placeholder="+91 98765 43210" />
+            </Field>
+            <InkButton type="submit" variant="primary" className="w-full !py-3 !text-base" disabled={busy}>{busy ? "Sending…" : "Send code →"}</InkButton>
+            {devMode && <p className="text-xs font-mono text-ink-soft dojo-inset p-3">Developer mode: no SMS provider is configured, so the code is printed in the backend console instead of being texted.</p>}
+          </form>
+        );
+      }
+      return (
+        <form onSubmit={verify} className="space-y-5" noValidate>
+          <Field id="otp" label={`Code sent to ${cleanPhone()}`} hint={devMode ? "Developer mode: read the code in the backend console." : "It expires in 5 minutes."} error={fieldError}>
+            <input id="otp" className="dojo-input tracking-[0.4em] text-center text-xl font-mono" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} aria-describedby="otp-help" placeholder="••••••" autoFocus />
+          </Field>
+          <Field id="p-name" label="Display name (new accounts)">
+            <input id="p-name" className="dojo-input" type="text" maxLength={24} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. kenshi" />
+          </Field>
+          <InkButton type="submit" variant="primary" className="w-full !py-3 !text-base" disabled={busy}>{busy ? "Verifying…" : "Verify & enter →"}</InkButton>
+          <div className="flex items-center justify-between text-sm">
+            <button type="button" className="font-semibold text-ink underline" onClick={() => { setStep("number"); setFieldError(""); }}>Change number</button>
+            <button type="button" className="font-semibold text-ink underline disabled:opacity-50 disabled:no-underline" disabled={cooldown > 0 || busy} onClick={() => sendCode()}>
+              {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+            </button>
+          </div>
+        </form>
+      );
+    }
+
+    // <AuthCard>: the "Enter the Dojo" card with Nickname / Google / Phone sign-in
+    function AuthCard({ onDone }) {
+      const { signIn } = useContext(DojoContext);
+      const [tab, setTab] = useState("dojo");
+      const [providers, setProviders] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [error, setError] = useState("");
+      const busyRef = useRef(false);
+
+      useEffect(() => {
+        let alive = true;
+        authApi.providers().then((p) => alive && setProviders(p)).catch(() => alive && setProviders({ pin: { enabled: true }, google: { enabled: false }, phone: { enabled: true, dev_mode: false } }));
+        return () => { alive = false; };
+      }, []);
+
+      // Single-flight wrapper: blocks duplicate submissions and turns failures into a friendly message
+      const run = async (fn) => {
+        if (busyRef.current) return;
+        busyRef.current = true;
+        setBusy(true);
+        setError("");
+        try { await fn(); } catch (err) { setError(friendlyAuthError(err)); } finally { busyRef.current = false; setBusy(false); }
+      };
+      const onSignedIn = (r) => { signIn({ learnerId: r.learner_id, token: r.token }); onDone(); };
+      const tabs = [["dojo", "Nickname"], ["google", "Google"], ["phone", "Phone"]];
+
+      return (
+        <div className="dojo-card p-6 md:p-8 space-y-5" aria-labelledby="enter-title">
+          <div>
+            <h2 id="enter-title" className="font-serif text-2xl md:text-3xl font-bold text-ink">Enter the Dojo</h2>
+            <p className="text-sm text-ink-soft mt-1">Begin your apprenticeship in Python bug hunting.</p>
+          </div>
+
+          <div className="auth-tabs" role="tablist" aria-label="Sign-in method">
+            {tabs.map(([key, label]) => (
+              <button key={key} role="tab" id={`tab-${key}`} aria-selected={tab === key} aria-controls={`panel-${key}`} className={`auth-tab ${tab === key ? "is-active" : ""}`} onClick={() => { setTab(key); setError(""); }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} key={tab} className="page-enter">
+            {tab === "dojo" && <NicknamePanel run={run} busy={busy} onSignedIn={onSignedIn} onGuest={onDone} />}
+            {tab === "google" && <GooglePanel providers={providers} run={run} busy={busy} onSignedIn={onSignedIn} />}
+            {tab === "phone" && <PhonePanel providers={providers} run={run} busy={busy} onSignedIn={onSignedIn} />}
+          </div>
+
+          {error && <div role="alert" className="dojo-inset p-3 text-sm text-seal font-semibold" style={{ borderColor: "rgb(var(--seal-rgb) / .45)" }}>{error}</div>}
+
+          <p className="text-center text-xs font-mono text-ink-soft dojo-inset py-2.5 px-3">
+            No real names or emails stored. Google and phone sign-in keep only a one-way hash.
+          </p>
+        </div>
+      );
+    }
+
+    // <LoadError>: shown when a learner endpoint fails (protected profile, network down, server error)
+    function LoadError({ error, onNavigate, onRetry }) {
+      const authIssue = error && (error.status === 401 || error.status === 403);
+      return (
+        <PaperCard accent className="text-center space-y-4 max-w-xl mx-auto" pad="p-8">
+          <Seal char={authIssue ? "鍵" : "障"} size="lg" />
+          <h3 className="font-serif text-2xl font-bold text-ink">{authIssue ? "This profile is protected" : "The scroll could not be unrolled"}</h3>
+          <p className="text-ink-soft text-sm">
+            {authIssue ? "Sign in to open this learner's progress." : friendlyAuthError(error)}
+          </p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {authIssue && <InkButton variant="primary" onClick={() => onNavigate("/welcome")}>Sign in</InkButton>}
+            {onRetry && <InkButton variant="secondary" onClick={onRetry}>Try again</InkButton>}
+          </div>
+        </PaperCard>
+      );
+    }
+
+    // Kata card used inside the dashboard slider
+    function KataSlideCard({ c, onOpen }) {
+      const st = STATUS_META[c.status] || STATUS_META.new;
+      return (
+        <PaperCard interactive onClick={onOpen} className="h-full" pad="p-5">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="pill uppercase">{c.difficulty}</span>
+            <span className={`pill ${st.pill}`}>{st.label}</span>
+          </div>
+          <h4 className="font-serif text-xl font-bold text-ink">{c.title}</h4>
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {c.concepts.map((concept) => <span key={concept} className="pill !py-0 !text-[11px]">#{concept}</span>)}
+          </div>
+          <div className="mt-4 text-xs font-mono font-medium text-seal">Attempt Kata →</div>
+        </PaperCard>
+      );
+    }
+
+    // <LiveHintsPanel>: three-layer hints about the code currently in the editor, refreshed as you type
+    function LiveHintsPanel({ live, codeIsBlank }) {
+      const layers = [["Nudge", "pill-indigo"], ["Pointer", "pill-ochre"], ["Approach", "pill-seal"]];
+      const { status, ladder } = live;
+      return (
+        <section aria-label="Live hints for your code" className="mb-4 pb-4 border-b border-blossom/30">
+          <div className="flex items-center justify-between gap-2 mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${status === "loading" ? "bg-ochre animate-pulse" : status === "error" ? "bg-seal" : "bg-pine live-dot"}`}></span>
+              <span className="eyebrow !text-ink-soft">Live hints</span>
+            </div>
+            <span className="text-[11px] font-mono text-ink-soft">
+              {status === "loading" ? "reading your code…" : status === "error" ? "unavailable" : ladder.length ? "updates as you type" : "watching your code"}
+            </span>
+          </div>
+          <div aria-live="polite">
+            {status === "error" ? (
+              <p className="text-xs font-mono text-seal">Could not analyse your code right now ({live.message || "network error"}). It will retry when you keep typing.</p>
+            ) : ladder.length ? (
+              <div className="space-y-2">
+                {ladder.map((text, i) => (
+                  <div key={i} className="dojo-inset p-3 text-xs leading-relaxed flex gap-3 items-start border border-blossom/20 page-enter" style={{ animationDelay: `${i * 60}ms` }}>
+                    <Seal char={String(i + 1)} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <span className={`pill ${layers[i][1]} text-[10px] uppercase tracking-wider font-bold mb-1`}>{layers[i][0]}</span>
+                      <div className="text-ink font-sans">{text}</div>
+                    </div>
+                  </div>
+                ))}
+                {live.notes && live.notes.length > 0 && (
+                  <div className="dojo-inset p-3 text-xs leading-relaxed">
+                    <div className="eyebrow !text-ink-soft mb-1">Also noticed</div>
+                    <ul className="list-disc pl-4 space-y-1 text-ink">
+                      {live.notes.map((n, i) => <li key={i}>{n}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : status === "loading" && !ladder.length ? (
+              <p className="text-xs font-mono text-ink-soft">Reading your code…</p>
+            ) : (
+              <p className="text-xs font-mono text-ink-soft leading-relaxed">
+                {codeIsBlank ? "Start typing in solution.py and hints will appear here." : "Nothing looks structurally wrong with your code. Click Run Visible and the hints will react to which tests fail."}
+              </p>
+            )}
+          </div>
+        </section>
+      );
+    }
+
+    // --- NAVIGATION RAIL & HEADER ---
+    const NAV_ITEMS = [
+      { route: "/", label: "Dashboard", shortLabel: "巻物" },
+      { route: "/welcome", label: "Welcome", shortLabel: "入門" },
+      { route: "/challenge/last-k-total", label: "Challenge", shortLabel: "稽古" },
+      { route: "/progress", label: "Progress", shortLabel: "修練" },
+      { route: "/history", label: "History", shortLabel: "記録" },
+    ];
+
+    function isNavActive(currentRoute, itemRoute) {
+      return currentRoute === itemRoute || (itemRoute.startsWith("/challenge") && currentRoute.startsWith("/challenge"));
+    }
+
+    function NavigationRail({ currentRoute, onNavigate }) {
+      return (
+        <>
+          {/* Desktop floating glass dock */}
+          <aside className="nav-rail" aria-label="Primary">
+            <button
+              className="group flex flex-col items-center bg-transparent border-0 cursor-pointer"
+              onClick={() => onNavigate("/")}
+              title="Debug Dojo — Home"
+              aria-label="Debug Dojo home"
+            >
+              <Seal char="道" size="lg" />
+              <span className="text-[10px] font-mono tracking-[0.18em] uppercase mt-2 text-ink-soft font-semibold">Dojo</span>
+            </button>
+
+            <hr className="dojo-divider w-10 my-5" />
+
+            <nav className="flex-1 flex flex-col items-center gap-2.5 w-full">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.route}
+                  onClick={() => onNavigate(item.route)}
+                  className="nav-item"
+                  aria-current={isNavActive(currentRoute, item.route) ? "page" : undefined}
+                  title={item.label}
+                >
+                  <span className="nav-kanji">{item.shortLabel}</span>
+                  <span className="nav-label">{item.label}</span>
+                </button>
+              ))}
+            </nav>
+
+            <div className="text-[10px] font-mono text-ink-soft text-center px-1">v0.2 桜</div>
+          </aside>
+
+          {/* Mobile floating bottom bar */}
+          <nav className="mobile-bar" aria-label="Primary">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.route}
+                onClick={() => onNavigate(item.route)}
+                className="nav-item"
+                aria-current={isNavActive(currentRoute, item.route) ? "page" : undefined}
+              >
+                <span className="nav-kanji" style={{ fontSize: 16 }}>{item.shortLabel}</span>
+                <span className="nav-label">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </>
+      );
+    }
+
+    // Top Header with Wordmark, ambience, sign in/out, theme toggle and learner identity
+    function AppHeader({ isDark, onToggleTheme, onNavigate }) {
+      const { learnerId, session, signOut } = useContext(DojoContext);
+
+      return (
+        <header className="app-header">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="wordmark text-xl sm:text-2xl text-ink whitespace-nowrap">Debug Dojo</span>
+            <span className="pill hidden sm:inline-flex">道場</span>
+            <span className="text-xs font-mono text-ink-soft hidden xl:inline truncate">
+              Learn to find bugs in your own Python code
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3 flex-none">
+            <div className="hidden min-[480px]:block"><div className="pill !py-1.5 !px-3" title={session ? "Signed in" : "Guest learner (not signed in)"}>
+              <span className={`w-2 h-2 rounded-full live-dot ${session ? "bg-pine" : "bg-ochre"}`}></span>
+              <span className="hidden md:inline">{session ? "Signed in:" : "Guest:"}</span>
+              <span className="font-semibold text-ink max-w-[84px] sm:max-w-[180px] truncate">{learnerId}</span>
+            </div></div>
+
+            <AmbiencePanel />
+
+            {session ? (
+              <button onClick={signOut} className="dojo-btn !py-2 !px-3 text-xs" title="Sign out" aria-label="Sign out">
+                <span aria-hidden="true">⎋</span><span className="hidden sm:inline">Sign out</span>
+              </button>
+            ) : (
+              <button onClick={() => onNavigate("/welcome")} className="dojo-btn !py-2 !px-3 text-xs" title="Sign in" aria-label="Sign in">
+                <span aria-hidden="true">→</span><span className="hidden sm:inline">Sign in</span>
+              </button>
+            )}
+
+            <button
+              onClick={onToggleTheme}
+              className="dojo-btn dojo-btn-icon"
+              title={isDark ? "Switch to Day Blossom" : "Switch to Night Lantern"}
+              aria-label="Toggle theme"
+            >
+              {isDark ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4.5" />
+                  <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.8 1.8M17.27 17.27l1.8 1.8M2 12h2.5M19.5 12H22M4.93 19.07l1.8-1.8M17.27 6.73l1.8-1.8" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </header>
+      );
+    }
+
+    // --- PAGES ---
+    const DIFFICULTY_META = {
+      easy: { kanji: "初段", label: "Easy Katas" },
+      medium: { kanji: "弐段", label: "Medium Katas" },
+      hard: { kanji: "参段", label: "Hard Katas" },
+    };
+    const STATUS_META = {
+      solved: { label: "Solved", ring: "is-solved", mark: "✓", pill: "pill-pine" },
+      attempted: { label: "Attempted", ring: "is-attempted", mark: "", pill: "pill-ochre" },
+      new: { label: "New", ring: "is-new", mark: "", pill: "" },
+    };
+
+    // 1. Dashboard Page (Route: /)
+    function DashboardPage({ onNavigate }) {
+      const { learnerId } = useContext(DojoContext);
+      const [learner, setLearner] = useState(null);
+      const [challenges, setChallenges] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [reload, setReload] = useState(0);
+
+      useEffect(() => {
+        let alive = true;
+        async function load() {
+          setLoading(true);
+          setError(null);
+          try {
+            const [lData, cData] = await Promise.all([
+              api.getLearner(learnerId),
+              api.listChallenges()
+            ]);
+            if (!alive) return;
+            setLearner(lData);
+            setChallenges(cData);
+          } catch (e) {
+            if (alive) setError(e);
+          } finally {
+            if (alive) setLoading(false);
+          }
+        }
+        load();
+        return () => { alive = false; };
+      }, [learnerId, reload]);
+
+      if (loading) return <Loader label="Unfurling scroll records..." />;
+      if (error || !learner) return <LoadError error={error} onNavigate={onNavigate} onRetry={() => setReload((n) => n + 1)} />;
+
+      const order = ["easy", "medium", "hard"];
+      const extra = [...new Set(challenges.map((c) => c.difficulty))].filter((d) => !order.includes(d));
+      const groups = [...order, ...extra]
+        .map((d) => ({ key: d, items: challenges.filter((c) => c.difficulty === d) }))
+        .filter((g) => g.items.length > 0);
+
+      return (
+        <div className="space-y-8 md:space-y-10">
+          {/* Hero greeting */}
+          <Reveal>
+            <section className="dojo-card dojo-card-accent overflow-hidden p-6 md:p-10">
+              <div className="absolute -right-4 -top-10 font-serif text-[16rem] leading-none opacity-[0.06] select-none pointer-events-none" aria-hidden="true">桜</div>
+              <Eyebrow dot>道場 · Dashboard</Eyebrow>
+              <h1 className="hero-title mt-3 text-ink">
+                {greeting()},<br />
+                <span className="gradient-text break-all">{learnerId}.</span>
+              </h1>
+              <p className="text-ink-soft text-base md:text-lg mt-4 max-w-xl">
+                Observe your bug-hunting mastery, streaks, and recommended training.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-5">
+                <span className="pill pill-ochre">Rank: Apprentice Hunter</span>
+                <span className="pill">Longest streak: {learner.stats.longest_streak}</span>
+              </div>
+            </section>
+          </Reveal>
+
+          {/* Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Reveal delay={60} className="h-full">
+              <PaperCard className="h-full overflow-hidden">
+                <span className="absolute right-3 bottom-0 font-serif text-7xl opacity-[0.07] select-none" aria-hidden="true">虫</span>
+                <CountUp value={learner.stats.bugs_defeated} label="Bugs Defeated" />
+                <p className="text-xs text-ink-soft mt-3 font-mono">Found & excised independently</p>
+              </PaperCard>
+            </Reveal>
+
+            <Reveal delay={120} className="h-full">
+              <PaperCard className="h-full overflow-hidden">
+                <span className="absolute right-3 bottom-0 font-serif text-7xl opacity-[0.07] select-none" aria-hidden="true">連</span>
+                <CountUp value={learner.stats.independent_streak} label="Current Streak" suffix=" runs" />
+                <p className="text-xs text-pine font-mono mt-3 font-semibold">Longest: {learner.stats.longest_streak}</p>
+              </PaperCard>
+            </Reveal>
+
+            <Reveal delay={180} className="h-full">
+              <PaperCard className="h-full overflow-hidden">
+                <span className="absolute right-3 bottom-0 font-serif text-7xl opacity-[0.07] select-none" aria-hidden="true">心</span>
+                <CountUp value={Math.round(learner.stats.prediction_accuracy * 100)} label="Prediction Accuracy" suffix="%" />
+                <p className="text-xs text-ink-soft mt-3 font-mono">Mental simulation skill</p>
+              </PaperCard>
+            </Reveal>
+
+            <Reveal delay={240} className="h-full">
+              <PaperCard className="h-full overflow-hidden">
+                <span className="absolute right-3 bottom-0 font-serif text-7xl opacity-[0.07] select-none" aria-hidden="true">経</span>
+                <CountUp value={learner.stats.xp} label="Dojo Experience (XP)" />
+                <p className="text-xs text-ochre font-mono mt-3 font-semibold">Rank: Apprentice Hunter</p>
+              </PaperCard>
+            </Reveal>
+          </div>
+
+          {/* Next Recommended Challenge Callout */}
+          {learner.next_challenge && (
+            <Reveal delay={300}>
+              <PaperCard accent className="overflow-hidden" pad="p-6 md:p-8">
+                <div className="absolute right-5 top-5 opacity-20 hidden sm:block float-slow" aria-hidden="true">
+                  <Seal char="道" size="xl" />
+                </div>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative">
+                  <div className="max-w-2xl">
+                    <Eyebrow>Recommended Dojo Kata</Eyebrow>
+                    <h3 className="font-serif text-2xl md:text-3xl font-bold mt-2 text-ink">
+                      {learner.next_challenge.title}
+                    </h3>
+                    <p className="text-ink-soft text-sm md:text-base mt-2 border-l-2 border-blossom/60 pl-3 italic">
+                      {learner.next_challenge.reason}
+                    </p>
+                  </div>
+                  <InkButton
+                    variant="primary"
+                    className="self-start md:self-center md:mr-20 !px-6 !py-3"
+                    onClick={() => onNavigate(`/challenge/${learner.next_challenge.id}`)}
+                  >
+                    Enter Challenge →
+                  </InkButton>
+                </div>
+              </PaperCard>
+            </Reveal>
+          )}
+
+          {/* Continue your path — draggable slider of attempted + new katas */}
+          {(() => {
+            const todo = [...challenges.filter((c) => c.status === "attempted"), ...challenges.filter((c) => c.status === "new")].slice(0, 8);
+            if (todo.length === 0) return null;
+            return (
+              <Reveal delay={340}>
+                <section aria-labelledby="path-title" className="space-y-4">
+                  <div>
+                    <h3 id="path-title" className="font-serif text-2xl md:text-3xl font-bold text-ink">Continue Your Path</h3>
+                    <p className="text-sm text-ink-soft mt-1">Pick up an attempted kata or start a fresh one. Drag, swipe, or use the arrows.</p>
+                  </div>
+                  <Slider
+                    label="Katas to continue"
+                    perView={{ base: 1, sm: 2, lg: 3 }}
+                    items={todo.map((c) => ({ key: c.id, node: <KataSlideCard c={c} onOpen={() => onNavigate(`/challenge/${c.id}`)} /> }))}
+                  />
+                </section>
+              </Reveal>
+            );
+          })()}
+
+          {/* Dojo Challenges Overview — grouped by rank */}
+          <section className="space-y-6" aria-labelledby="archive-title">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h3 id="archive-title" className="font-serif text-2xl md:text-3xl font-bold text-ink">Challenge Scroll Archive</h3>
+                <p className="text-sm text-ink-soft mt-1">Select a kata to inspect tests and hunt bugs.</p>
+              </div>
+              <span className="pill hidden sm:inline-flex">{challenges.length} Katas Available</span>
+            </div>
+
+            {groups.map((g, gi) => {
+              const meta = DIFFICULTY_META[g.key] || { kanji: "段", label: `${g.key} Katas` };
+              return (
+                <div key={g.key} className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="font-serif text-lg md:text-xl font-bold text-ink">
+                      <span className="text-seal mr-1.5">{meta.kanji}</span>/ {meta.label}
+                    </span>
+                    <span className="pill">{g.items.length} {g.items.length === 1 ? "Challenge" : "Challenges"}</span>
+                    <hr className="dojo-divider flex-1" />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {g.items.map((c, i) => {
+                      const st = STATUS_META[c.status] || STATUS_META.new;
+                      const isNext = learner.next_challenge && learner.next_challenge.id === c.id;
+                      return (
+                        <Reveal key={c.id} delay={gi * 60 + i * 50}>
+                          <PaperCard
+                            interactive
+                            pad="p-0"
+                            onClick={() => onNavigate(`/challenge/${c.id}`)}
+                            className={isNext ? "dojo-card-accent" : ""}
+                          >
+                            <div className="kata-row">
+                              <span className={`status-ring ${st.ring}`} aria-hidden="true">{st.mark}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-serif text-lg font-bold text-ink">{c.title}</h4>
+                                  {isNext && <span className="pill pill-seal !py-0">Next up</span>}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  {c.concepts.map((concept) => (
+                                    <span key={concept} className="pill !py-0 !text-[11px]">#{concept}</span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1.5 flex-none">
+                                <span className={`pill ${st.pill}`}>{st.label}</span>
+                                <span className="text-xs font-mono font-medium text-seal hidden sm:inline">Attempt Kata →</span>
+                              </div>
+                            </div>
+                          </PaperCard>
+                        </Reveal>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        </div>
+      );
+    }
+
+    // 2. Welcome Page (Route: /welcome)
+    function WelcomePage({ onNavigate }) {
+      const MODE_SLIDES = [
+        ["予", "Predict before you run", "Commit to what you think will happen, then run. Your prediction accuracy is tracked on your dashboard."],
+        ["走", "Run in the sandbox", "Try your code against the visible tests as often as you like. Submitting also grades hidden tests, and only pass or fail outcomes are ever shown, never the answers."],
+        ["灯", "Socratic hints", "Stuck? Ask for progressive nudges. They point at where to look and never hand you the fix."],
+        ["遺", "Bug DNA", "Debug Dojo tracks the mistakes you repeat across katas, so you can unlearn the habit instead of patching one bug."],
+        ["闘", "Bug Arena", "Every submission shows which bug spirits you have defeated and which are still lurking."],
+        ["集", "Focus mode", "Collapse the chrome on the workbench for a distraction-free, full-screen editing space."],
+      ];
+
+      return (
+        <div className="space-y-10 md:space-y-14">
+          {/* Hero + entry card */}
+          <section className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-8 lg:gap-12 items-center pt-2 md:pt-6">
+            <Reveal>
+              <div>
+                <Eyebrow dot>Tactile Python coaching</Eyebrow>
+                <h1 className="hero-title mt-4 text-ink">
+                  Find the bug.<br />
+                  <span className="gradient-text">Keep the answer.</span>
+                </h1>
+                <p className="text-ink-soft text-lg md:text-xl mt-5 max-w-xl">
+                  Debug Dojo never hands you the fix. It points you to where to look, then helps you stop making the same mistake.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-blossom/30 max-w-2xl">
+                  {[
+                    ["01 / Inspect", "Mental Trace", "Predict outputs before executing code."],
+                    ["02 / Excise", "Targeted Hints", "Progressive nudges, never solutions."],
+                    ["03 / Ingrain", "Bug DNA", "Pinpoint cognitive loops to unlearn habits."],
+                  ].map(([k, t, d]) => (
+                    <div key={k}>
+                      <div className="eyebrow !text-[10.5px]">{k}</div>
+                      <div className="font-serif text-lg font-bold text-ink mt-1">{t}</div>
+                      <p className="text-sm text-ink-soft mt-0.5">{d}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+
+            <Reveal delay={120}>
+              <div className="relative pt-16 sm:pt-20">
+                <div className="hero-lanterns">
+                  <Lantern char="道" size={46} delay={0} hang={30} />
+                  <Lantern char="場" size={38} delay={-1.6} hang={40} />
+                  <Lantern char="桜" size={42} delay={-3.1} hang={22} />
+                </div>
+                <AuthCard onDone={() => onNavigate("/")} />
+              </div>
+            </Reveal>
+          </section>
+
+          <Reveal>
+            <section aria-labelledby="modes-title" className="space-y-4">
+              <div>
+                <Eyebrow>Training modes</Eyebrow>
+                <h3 id="modes-title" className="font-serif text-2xl md:text-3xl font-bold text-ink mt-1">How the dojo trains you</h3>
+              </div>
+              <Slider
+                label="Training modes"
+                autoplay={6500}
+                perView={{ base: 1, lg: 1 }}
+                items={MODE_SLIDES.map(([kanji, title, body]) => ({
+                  key: title,
+                  node: (
+                    <PaperCard accent className="h-full" pad="p-6 md:p-8">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                        <Seal char={kanji} size="xl" />
+                        <div>
+                          <h4 className="font-serif text-2xl font-bold text-ink">{title}</h4>
+                          <p className="text-ink-soft mt-2 max-w-2xl">{body}</p>
+                        </div>
+                      </div>
+                    </PaperCard>
+                  ),
+                }))}
+              />
+            </section>
+          </Reveal>
+
+          <Reveal delay={80}>
+            <PaperCard className="space-y-4" pad="p-6 md:p-8">
+              <h3 className="font-serif text-xl md:text-2xl font-bold text-ink">The Dojo Philosophy</h3>
+              <p className="text-ink">
+                Most platforms tell you what to type. The <strong>Debug Dojo</strong> trains your mental execution model. When code misbehaves, real programmers do not guess—they inspect, hypothesize, and bound their edge cases.
+              </p>
+              <div className="dojo-inset p-4 md:p-5 font-mono text-sm space-y-2">
+                <div className="text-seal font-semibold">Three Principles of the Dojo:</div>
+                <ol className="list-decimal pl-5 space-y-1 text-ink-soft">
+                  <li><strong className="text-ink">No Leaked Secrets:</strong> Hidden test implementations are never revealed; only pure outcomes.</li>
+                  <li><strong className="text-ink">Prediction Before Execution:</strong> Formulate what should happen before running the code.</li>
+                  <li><strong className="text-ink">Ink on Paper:</strong> Tracing index mathematics with quiet focus beats frantic AI generation.</li>
+                </ol>
+              </div>
+            </PaperCard>
+          </Reveal>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              ["01", "Inspect Visible Tests", "Study test inputs, invocations, and expected outcomes."],
+              ["02", "Formulate & Submit", "Run tests. Analyze hidden test failures and mistake DNA."],
+              ["03", "Request Socratic Hints", "Guided inquiry without spoiling the realization."],
+            ].map(([n, t, d], i) => (
+              <Reveal key={n} delay={140 + i * 70} className="h-full">
+                <PaperCard className="h-full" interactive={false}>
+                  <div className="font-serif text-3xl font-bold text-seal/90 mb-1">{n}</div>
+                  <h4 className="font-bold text-sm mb-1 text-ink">{t}</h4>
+                  <p className="text-xs text-ink-soft">{d}</p>
+                </PaperCard>
+              </Reveal>
+            ))}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <InkButton variant="primary" className="!py-3" onClick={() => onNavigate("/challenge/last-k-total")}>
+              Begin First Kata: Last K Total →
+            </InkButton>
+            <InkButton variant="secondary" className="!py-3" onClick={() => onNavigate("/")}>
+              View Dashboard
+            </InkButton>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Challenge Page (Route: /challenge/:id) - LeetCode Workbench with Sakura Design
+    function ChallengePage({ challengeId = "last-k-total", onNavigate }) {
+      const { learnerId, focusMode, setFocusMode, isFocusActive } = useContext(DojoContext);
+      const [challenge, setChallenge] = useState(null);
+      const [code, setCode] = useState("");
+      const [error, setError] = useState(null);
+
+      // Focus Mode Sub-state (Collapsing description panel to slim toggle)
+      const [descCollapsed, setDescCollapsed] = useState(false);
+
+      // When focus mode toggles, collapse or expand description panel accordingly
+      useEffect(() => {
+        if (isFocusActive) {
+          setDescCollapsed(true);
+        } else {
+          setDescCollapsed(false);
+        }
+      }, [isFocusActive]);
+
+      // Focus mode keyboard shortcuts: 'F' toggles focus mode (when editor/inputs not focused); 'Escape' exits focus mode
+      useEffect(() => {
+        const handleFocusKeys = (e) => {
+          // Escape exits focus mode
+          if (e.key === "Escape" && isFocusActive) {
+            e.preventDefault();
+            if (setFocusMode) setFocusMode(false);
+            return;
+          }
+
+          // F key toggles focus mode when editor and input fields are not focused
+          if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const active = document.activeElement;
+            const isInput = active && (
+              active.tagName === "INPUT" ||
+              active.tagName === "TEXTAREA" ||
+              active.tagName === "SELECT" ||
+              active.isContentEditable ||
+              (active.closest && (active.closest(".CodeMirror") || active.closest(".code-window")))
+            );
+            if (!isInput) {
+              e.preventDefault();
+              if (setFocusMode) setFocusMode(prev => !prev);
+            }
+          }
+        };
+
+        window.addEventListener("keydown", handleFocusKeys, true);
+        return () => window.removeEventListener("keydown", handleFocusKeys, true);
+      }, [isFocusActive, setFocusMode]);
+
+      // Workbench Execution States
+      const [runResult, setRunResult] = useState(null);
+      const [submitResult, setSubmitResult] = useState(null);
+      const [lastAction, setLastAction] = useState(null); // 'run' | 'submit' | null
+      const [running, setRunning] = useState(false);
+      const [submitting, setSubmitting] = useState(false);
+      const [activeCaseTab, setActiveCaseTab] = useState(0); // number or 'hidden'
+      const [prediction, setPrediction] = useState("");
+
+      // Left Pane States (Description vs Submissions)
+      const [activeLeftTab, setActiveLeftTab] = useState("description"); // 'description' | 'submissions'
+      const [historyList, setHistoryList] = useState(null);
+      const [historyLoading, setHistoryLoading] = useState(false);
+      const [inspectingSubmission, setInspectingSubmission] = useState(null);
+
+      // Socratic Hints
+      const [lastSubmitted, setLastSubmitted] = useState(null); // {id, code} of the latest graded submit
+
+      // Split Pane Resizing
+      const [splitPercent, setSplitPercent] = useState(44);
+      const [isDragging, setIsDragging] = useState(false);
+      const splitContainerRef = useRef(null);
+
+      // Load challenge and starter code / draft
+      useEffect(() => {
+        async function load() {
+          try {
+            setError(null);
+            setRunResult(null);
+            setSubmitResult(null);
+            setLastAction(null);
+            setHistoryList(null);
+            setInspectingSubmission(null);
+            setActiveCaseTab(0);
+
+            const data = await api.getChallenge(challengeId);
+            setChallenge(data);
+            const draft = await api.getDraft(learnerId, challengeId);
+            setCode(draft || data.starter_code);
+          } catch (err) {
+            setError("Could not retrieve challenge scroll from the archive.");
+          }
+        }
+        load();
+      }, [challengeId, learnerId]);
+
+      // Split pane drag resizing
+      const handleMouseDown = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      };
+
+      useEffect(() => {
+        const handleMouseMove = (e) => {
+          if (!isDragging || !splitContainerRef.current) return;
+          const rect = splitContainerRef.current.getBoundingClientRect();
+          const newPercent = ((e.clientX - rect.left) / rect.width) * 100;
+          setSplitPercent(Math.max(25, Math.min(75, newPercent)));
+        };
+
+        const handleMouseUp = () => {
+          if (isDragging) setIsDragging(false);
+        };
+
+        if (isDragging) {
+          window.addEventListener("mousemove", handleMouseMove);
+          window.addEventListener("mouseup", handleMouseUp);
+        }
+        return () => {
+          window.removeEventListener("mousemove", handleMouseMove);
+          window.removeEventListener("mouseup", handleMouseUp);
+        };
+      }, [isDragging]);
+
+      // Submissions History Loader
+      const loadSubmissions = async () => {
+        setHistoryLoading(true);
+        try {
+          const list = await api.getChallengeSubmissions(learnerId, challengeId);
+          setHistoryList(list || []);
+        } catch (err) {
+          setError("Could not retrieve submission chronicles.");
+        } finally {
+          setHistoryLoading(false);
+        }
+      };
+
+      const handleInspectSubmission = async (subId) => {
+        setHistoryLoading(true);
+        try {
+          const detail = await api.getSubmission(subId);
+          setInspectingSubmission(detail);
+        } catch (err) {
+          setError("Could not load snapshot for that submission.");
+        } finally {
+          setHistoryLoading(false);
+        }
+      };
+
+      // Run button: POST /api/run
+      const handleRun = async () => {
+        if (running || submitting) return;
+        setRunning(true);
+        setError(null);
+        try {
+          const res = await api.run(learnerId, challengeId, code);
+          setRunResult(res);
+          setRanCode(code);
+          setLastAction("run");
+          setActiveCaseTab(0);
+        } catch (err) {
+          setError(err.message || "Execution failed or timed out.");
+        } finally {
+          setRunning(false);
+        }
+      };
+
+      // Submit button: POST /api/submit
+      const handleSubmit = async () => {
+        if (running || submitting) return;
+        setSubmitting(true);
+        setError(null);
+        try {
+          const res = await api.submit(learnerId, challengeId, code, prediction || undefined);
+          setSubmitResult(res);
+          setLastSubmitted({ id: res.submission_id, code });
+          setRanCode(code);
+          setLastAction("submit");
+          setActiveCaseTab(0);
+          // Refresh submissions if tab was visited or open
+          if (historyList !== null) {
+            loadSubmissions();
+          }
+        } catch (err) {
+          setError(err.message || "Evaluation timed out or was interrupted.");
+        } finally {
+          setSubmitting(false);
+        }
+      };
+
+      // Live hints: re-analyse the editor code ~0.6s after you stop typing. If you have run the visible tests on this
+      // exact code, their pass/fail outcomes are included so the hints can point at what actually failed.
+      const [liveHints, setLiveHints] = useState({ status: "idle", ladder: [], focus: null });
+      const [ranCode, setRanCode] = useState(null);
+      useEffect(() => {
+        if (!challenge) return;
+        let alive = true;
+        setLiveHints((prev) => ({ ...prev, status: "loading" }));
+        const timer = setTimeout(async () => {
+          const result = lastAction === "submit" && submitResult ? submitResult.visible : lastAction === "run" && runResult ? runResult.visible : null;
+          const outcomes = ranCode === code && result ? result.map((v) => v.outcome) : undefined;
+          try {
+            const res = await api.getLiveHints({ challenge_id: challengeId, code, visible_outcomes: outcomes });
+            if (alive) setLiveHints({ status: "ready", ladder: res.ladder || [], focus: res.focus || null, notes: res.notes || [] });
+          } catch (e) {
+            if (alive) setLiveHints({ status: "error", ladder: [], focus: null, message: e.message });
+          }
+        }, 600);
+        return () => { alive = false; clearTimeout(timer); };
+      }, [code, challengeId, !!challenge, runResult, submitResult, lastAction, ranCode]);
+
+      // Keyboard shortcuts: Ctrl/Cmd+Enter = Run, Ctrl/Cmd+Shift+Enter = Submit
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          const isMod = e.ctrlKey || e.metaKey;
+          if (isMod && e.key === "Enter") {
+            e.preventDefault();
+            if (e.shiftKey) {
+              if (!submitting && !running) handleSubmit();
+            } else {
+              if (!running && !submitting) handleRun();
+            }
+          }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+      }, [code, learnerId, challengeId, running, submitting, prediction, historyList]);
+
+      if (!challenge) {
+        return (
+          <>
+            <ErrorBanner message={error} onDismiss={() => setError(null)} />
+            {!error && <Loader label="Loading kata parchment..." />}
+          </>
+        );
+      }
+
+      // Presets for quick experimentation
+      const applyBuggyPreset = () => {
+        if (challengeId === "last-k-total") {
+          setCode("def last_k_total(marks, k):\n    start = len(marks) - k\n    return sum(marks[start:])\n");
+        } else if (challengeId === "middle-three") {
+          setCode("def middle_three(items):\n    mid = len(items) // 2\n    return items[mid-1:mid+2]\n");
+        } else {
+          setCode(challenge.starter_code);
+        }
+      };
+
+      const applyPassingPreset = () => {
+        if (challengeId === "last-k-total") {
+          setCode("def last_k_total(marks, k):\n    start = max(0, len(marks) - k)\n    return sum(marks[start:])\n");
+        } else if (challengeId === "middle-three") {
+          setCode("def middle_three(items):\n    if len(items) < 3:\n        return []\n    mid = len(items) // 2\n    return items[mid-1:mid+2]\n");
+        } else {
+          setCode(challenge.starter_code);
+        }
+      };
+
+      // Visible test items depending on last action
+      const activeVisibleTests = lastAction === "submit" && submitResult
+        ? submitResult.visible
+        : lastAction === "run" && runResult
+        ? runResult.visible
+        : challenge.visible_tests;
+
+      const currentCase = typeof activeCaseTab === "number" && activeVisibleTests[activeCaseTab]
+        ? activeVisibleTests[activeCaseTab]
+        : null;
+
+      return (
+        <div className={isFocusActive ? "h-full flex flex-col min-h-0 space-y-2 overflow-hidden" : "space-y-4"}>
+          <Reveal>
+            <div className={`dojo-card dojo-card-accent overflow-hidden transition-all ${
+              isFocusActive
+                ? "p-2.5 px-4 flex flex-row items-center justify-between gap-3 flex-none mb-1"
+                : "p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+            }`}>
+              <div className="min-w-0 flex items-center gap-3">
+                <div className="flex items-center flex-wrap gap-2">
+                  <span className="pill pill-seal uppercase text-[11px]">{challenge.difficulty} Kata</span>
+                  {!isFocusActive && (
+                    <span className="pill text-[11px]">{challenge.hidden_test_count} Hidden Tests Guarded</span>
+                  )}
+                </div>
+                <RuleHeading title={challenge.title} level={1} className={isFocusActive ? "!text-base !mb-0 truncate" : "!mb-0"} />
+              </div>
+              {!isFocusActive && challenge.description && (
+                <p className="text-xs text-ink-soft leading-relaxed sm:max-w-md md:max-w-lg">{challenge.description}</p>
+              )}
+              <div className="flex items-center gap-2 flex-none">
+                {/* Focus toggle button */}
+                <button
+                  type="button"
+                  onClick={() => setFocusMode && setFocusMode(prev => !prev)}
+                  className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-seal ${
+                    isFocusActive
+                      ? "bg-seal text-paper border-seal shadow-md hover:bg-seal/90"
+                      : "bg-paper-deep/30 hover:bg-paper-deep/60 text-ink border-blossom/40 hover:border-seal/60"
+                  }`}
+                  aria-label={isFocusActive ? "Exit focus mode (Esc)" : "Enter focus mode (F)"}
+                  aria-pressed={Boolean(isFocusActive)}
+                  title={isFocusActive ? "Exit focus mode (Esc or F)" : "Enter focus mode (F when editor not focused)"}
+                >
+                  <span aria-hidden="true">{isFocusActive ? "✕" : "⛶"}</span>
+                  <span>{isFocusActive ? "Exit Focus" : "Focus"}</span>
+                  <kbd className={`text-[10px] px-1 py-0.2 rounded font-mono ${isFocusActive ? "bg-black/20 text-paper" : "bg-black/5 dark:bg-white/10 text-ink-soft"}`}>
+                    {isFocusActive ? "Esc" : "F"}
+                  </kbd>
+                </button>
+                {!isFocusActive && (
+                  <InkButton variant="secondary" className="self-start sm:self-center flex-none" onClick={() => onNavigate("/")}>
+                    ← Return to Roster
+                  </InkButton>
+                )}
+              </div>
+            </div>
+          </Reveal>
+
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
+
+          {/* Workbench Resizable Split Container */}
+          <div ref={splitContainerRef} className={`split-container flex-col md:flex-row gap-0 ${isFocusActive ? "focus-workbench" : ""}`}>
+
+            {/* RIGHT PANE: Code Editor on Top, Results Panel Below */}
+            <div
+              className="w-full md:overflow-y-auto min-w-0 flex flex-col gap-3"
+              style={{
+                width: "100%",
+                flex: "1 1 auto",
+              }}
+            >
+              {/* TOP: Code Editor Window */}
+              <Reveal delay={60} className={isFocusActive ? "focus-editor-card" : ""}>
+                <PaperCard className={`code-window flex flex-col ${isFocusActive ? "h-full" : ""}`} pad="p-0">
+                  <div className="code-window-bar flex-none">
+                    <div className="flex items-center gap-3">
+                      <span className="traffic" aria-hidden="true"><i></i><i></i><i></i></span>
+                      <span className="text-xs font-mono font-semibold text-ink">solution.py</span>
+                      <span className="text-[11px] text-ink-soft font-mono">(Python 3)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={applyBuggyPreset}
+                        className="text-xs font-mono text-ink-soft hover:text-ink underline"
+                        title="Load intentional unhandled_short_input bug"
+                      >
+                        Preset Buggy Code
+                      </button>
+                      <span className="text-ink-soft">|</span>
+                      <button
+                        type="button"
+                        onClick={applyPassingPreset}
+                        className="text-xs font-mono text-pine hover:underline font-semibold"
+                        title="Load clean passing solution"
+                      >
+                        Preset Correct Code
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* CodeMirror 5 with fallback */}
+                  <div className={isFocusActive ? "flex-1 min-h-0 overflow-hidden" : ""}>
+                    <CodeMirrorEditor
+                      value={code}
+                      onChange={setCode}
+                      onRun={handleRun}
+                      onSubmit={handleSubmit}
+                      onEsc={() => isFocusActive && setFocusMode && setFocusMode(false)}
+                      refreshKey={`${isFocusActive}-${descCollapsed}`}
+                    />
+                  </div>
+
+                  {/* Editor Action Bar */}
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-4 py-2.5 border-t border-blossom/30 bg-paper-deep/20 flex-none">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono text-ink-soft hidden sm:inline">
+                        <kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 font-bold">Ctrl+Enter</kbd> Run
+                        <span className="mx-1.5">•</span>
+                        <kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 font-bold">Ctrl+Shift+Enter</kbd> Submit
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <InkButton
+                        variant="secondary"
+                        onClick={handleRun}
+                        disabled={running || submitting}
+                        className="!py-2 text-xs"
+                      >
+                        {running ? "Running Visible..." : "▶ Run Visible"}
+                      </InkButton>
+                      <InkButton
+                        variant="primary"
+                        onClick={handleSubmit}
+                        disabled={running || submitting}
+                        className="!py-2 text-xs"
+                      >
+                        {submitting ? "Evaluating Kata..." : "Execute & Submit →"}
+                      </InkButton>
+                    </div>
+                  </div>
+                </PaperCard>
+              </Reveal>
+
+              {/* BOTTOM: Results Panel */}
+              <Reveal delay={120} className={isFocusActive ? "focus-results-card" : ""}>
+                <PaperCard pad="p-4 md:p-5" className={isFocusActive ? "h-full flex flex-col overflow-y-auto" : ""}>
+                  <div className="flex items-center justify-between gap-3 mb-3 pb-2.5 border-b border-blossom/30">
+                    <h3 className="font-serif text-lg font-bold text-ink">Workbench Results</h3>
+                    {lastAction === "submit" && submitResult && (
+                      submitResult.all_passed ? (
+                        <span className="text-xs font-mono font-bold text-pine flex items-center gap-1.5">
+                          <Seal char="完" size="sm" animated /> All Tests Conquered
+                        </span>
+                      ) : (
+                        <span className="text-xs font-mono font-bold text-seal flex items-center gap-1.5">
+                          <Seal char="修" size="sm" animated /> Needs Refinement
+                        </span>
+                      )
+                    )}
+                    {lastAction === "run" && runResult && (
+                      <span className="text-xs font-mono text-ink-soft">Visible Bench Only (Draft)</span>
+                    )}
+                  </div>
+
+                  <LiveHintsPanel live={liveHints} codeIsBlank={!code.trim()} />
+
+                  {!lastAction ? (
+                    <div className="py-8 text-center text-ink-soft font-mono text-xs space-y-2">
+                      <div>Ready to evaluate your code.</div>
+                      <div className="text-[11px] opacity-75">
+                        Click <strong>Run Visible</strong> to test example cases, or <strong>Execute & Submit</strong> for full evaluation.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 page-enter">
+                      {/* Submit-specific master evaluation summaries */}
+                      {lastAction === "submit" && submitResult && (
+                        <>
+                          {/* Dojo Master Explanation */}
+                          <div className="dojo-inset p-3 text-xs md:text-sm">
+                            <div className="eyebrow !text-ink-soft mb-1">Dojo Master Observation</div>
+                            <p className="text-ink leading-relaxed">{submitResult.explanation}</p>
+                          </div>
+
+                          {/* Mistake Tags */}
+                          {submitResult.mistake_tags && submitResult.mistake_tags.length > 0 && (
+                            <div className="flex items-center flex-wrap gap-1.5">
+                              <span className="eyebrow mr-1">Diagnosed Mistake DNA:</span>
+                              {submitResult.mistake_tags.map(t => (
+                                <span key={t} className="pill pill-seal font-semibold text-xs">#{t}</span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Prediction Result (when present) */}
+                          {submitResult.prediction_result && (
+                            <div className="dojo-inset p-3 text-xs space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="eyebrow !text-ink-soft">Prediction Reflection</span>
+                                <span className={`pill ${submitResult.prediction_result.correct ? "pill-pine" : "pill-ochre"}`}>
+                                  {submitResult.prediction_result.correct ? "✓ Accurate Prediction" : "✗ Prediction Missed"}
+                                </span>
+                              </div>
+                              <div className="flex gap-4 font-mono text-xs text-ink-soft">
+                                <span>Predicted: <strong className="text-ink">{submitResult.prediction_result.predicted}</strong></span>
+                                <span>Actual: <strong className="text-ink">{submitResult.prediction_result.actual}</strong></span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Bug Arena (when present) */}
+                          {submitResult.arena && (
+                            <div className="dojo-inset p-3 text-xs space-y-2">
+                              <div className="eyebrow !text-ink-soft">Bug Arena Progress</div>
+                              <div className="flex flex-wrap gap-2">
+                                {submitResult.arena.defeated && submitResult.arena.defeated.map((d, i) => (
+                                  <span key={i} className="pill pill-pine text-[11px] font-mono">✓ {d}</span>
+                                ))}
+                                {submitResult.arena.remaining && submitResult.arena.remaining.map((r, i) => (
+                                  <span key={i} className="pill text-[11px] font-mono opacity-60">⏳ {r}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Tabbed Test Cases Bar */}
+                      <div>
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 mb-3 border-b border-blossom/20">
+                          {activeVisibleTests.map((vt, idx) => {
+                            const isPass = vt.outcome === "passed";
+                            const dotColor = isPass ? "bg-pine" : vt.outcome === "wrong_output" ? "bg-ochre" : "bg-seal";
+                            const isSelected = activeCaseTab === idx;
+                            return (
+                              <button
+                                key={vt.test || idx}
+                                type="button"
+                                onClick={() => setActiveCaseTab(idx)}
+                                className={`px-2.5 py-1 text-xs font-mono rounded flex items-center gap-1.5 transition-colors flex-none ${
+                                  isSelected
+                                    ? "bg-seal/15 text-seal font-bold border-b-2 border-seal shadow-xs"
+                                    : "text-ink-soft hover:text-ink hover:bg-black/5 dark:hover:bg-white/5"
+                                }`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`}></span>
+                                <span>Case {idx + 1}</span>
+                              </button>
+                            );
+                          })}
+
+                          {/* Dedicated Hidden Tests Tab (Submit only) */}
+                          {lastAction === "submit" && submitResult && submitResult.hidden && submitResult.hidden.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveCaseTab("hidden")}
+                              className={`px-2.5 py-1 text-xs font-mono rounded flex items-center gap-1.5 transition-colors flex-none ${
+                                activeCaseTab === "hidden"
+                                  ? "bg-seal/15 text-seal font-bold border-b-2 border-seal shadow-xs"
+                                  : "text-ink-soft hover:text-ink hover:bg-black/5 dark:hover:bg-white/5"
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                submitResult.hidden.every(h => h.outcome === "passed") ? "bg-pine" : "bg-seal"
+                              }`}></span>
+                              <span>Hidden ({submitResult.hidden.length})</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Selected Tab Content: Visible Test Details */}
+                        {typeof activeCaseTab === "number" && currentCase && (
+                          <div className="space-y-2.5 text-xs font-mono page-enter">
+                            <div className="flex items-center justify-between">
+                              <span className="eyebrow !text-ink-soft">Test Case #{activeCaseTab + 1}</span>
+                              <OutcomeBadge outcome={currentCase.outcome} limit={currentCase.limit} />
+                            </div>
+
+                            <div>
+                              <div className="text-[11px] text-ink-soft mb-1 font-mono">Invocation:</div>
+                              <pre className="dojo-inset p-2.5 text-xs text-ink overflow-x-auto"><code>{currentCase.call}</code></pre>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <div className="text-[11px] text-ink-soft mb-1 font-mono">Expected Output:</div>
+                                <pre className="dojo-inset p-2.5 text-xs text-pine font-semibold overflow-x-auto"><code>{currentCase.expected}</code></pre>
+                              </div>
+                              <div>
+                                <div className="text-[11px] text-ink-soft mb-1 font-mono">Actual Output (Got):</div>
+                                <pre className="dojo-inset p-2.5 text-xs text-ink overflow-x-auto"><code>{currentCase.got !== null && currentCase.got !== undefined ? String(currentCase.got) : "None"}</code></pre>
+                              </div>
+                            </div>
+
+                            {currentCase.error && (
+                              <div className="text-seal text-xs font-mono mt-1">Error: {currentCase.error}</div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Selected Tab Content: Hidden Tests Tab */}
+                        {/* HARD ANTI-LEAK SECURITY RULE: Hidden tests show ONLY "Hidden #n" and the outcome badge. NEVER render any other hidden data. */}
+                        {activeCaseTab === "hidden" && lastAction === "submit" && submitResult && (
+                          <div className="space-y-3 page-enter">
+                            <div className="flex items-center justify-between">
+                              <span className="eyebrow !text-ink-soft">Hidden Tests Integrity</span>
+                              <span className="text-[11px] font-mono text-ink-soft">Strictly Redacted Bench</span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {submitResult.hidden.map((h) => (
+                                <div key={h.test} className="dojo-inset px-3 py-2 text-xs font-mono flex flex-col gap-1.5">
+                                  <span className="text-ink-soft font-semibold">Hidden #{h.test}</span>
+                                  <OutcomeBadge outcome={h.outcome} limit={h.limit} />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </PaperCard>
+              </Reveal>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    // 4. Progress Page (Route: /progress)
+    function ProgressPage({ onNavigate }) {
+      const { learnerId } = useContext(DojoContext);
+      const [learner, setLearner] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [reload, setReload] = useState(0);
+
+      useEffect(() => {
+        let alive = true;
+        async function load() {
+          setLoading(true);
+          setError(null);
+          try {
+            const data = await api.getLearner(learnerId);
+            if (alive) setLearner(data);
+          } catch (e) {
+            if (alive) setError(e);
+          } finally {
+            if (alive) setLoading(false);
+          }
+        }
+        load();
+        return () => { alive = false; };
+      }, [learnerId, reload]);
+
+      if (loading) return <Loader label="Compiling progress scrolls..." />;
+      if (error || !learner) return <LoadError error={error} onNavigate={onNavigate} onRetry={() => setReload((n) => n + 1)} />;
+
+      const bugDna = learner.bug_dna || [];
+      const maxDna = Math.max(1, ...bugDna.map((b) => b.count));
+      const dnaColors = ["rgb(var(--seal-rgb))", "rgb(var(--ochre-rgb))", "rgb(var(--indigo-rgb))", "rgb(var(--pine-rgb))"];
+
+      return (
+        <div className="space-y-8">
+          <Reveal>
+            <RuleHeading
+              title="Progress & Mastery"
+              subtitle="Deep inspection of conceptual strengths, recurring mistake DNA, and earned seals."
+            />
+          </Reveal>
+
+          {/* Mastery grid */}
+          <Reveal delay={60}>
+            <PaperCard className="space-y-4" pad="p-6 md:p-8">
+              <div>
+                <h3 className="font-serif text-xl md:text-2xl font-bold text-ink">Conceptual Mastery Grid</h3>
+                <p className="text-xs font-mono text-ink-soft mt-1">
+                  Derived from independent pass rates across diverse test suites.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {Object.entries(learner.mastery).map(([concept, rate], i) => (
+                  <div key={concept} className="dojo-inset p-4 flex flex-col gap-2.5">
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <span className="uppercase font-semibold text-ink tracking-wide">{concept}</span>
+                      <span className="font-bold text-ink">{Math.round(rate * 100)}%</span>
+                    </div>
+                    <div className="meter" role="progressbar" aria-valuenow={Math.round(rate * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`${concept} mastery`}>
+                      <span
+                        style={{
+                          width: `${rate * 100}%`,
+                          animationDelay: `${i * 80}ms`,
+                          background: rate >= 0.7
+                            ? "linear-gradient(90deg, rgb(var(--pine-rgb) / .75), rgb(var(--pine-rgb)))"
+                            : rate >= 0.5
+                            ? "linear-gradient(90deg, rgb(var(--ochre-rgb) / .75), rgb(var(--ochre-rgb)))"
+                            : "linear-gradient(90deg, rgb(var(--blossom-rgb)), rgb(var(--seal-rgb)))",
+                        }}
+                      ></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </PaperCard>
+          </Reveal>
+
+          {/* Bug DNA frequency */}
+          {bugDna.length > 0 && (
+            <Reveal delay={120}>
+              <PaperCard pad="p-6 md:p-8">
+                <h3 className="font-serif text-xl md:text-2xl font-bold text-ink">Your Bug DNA</h3>
+                <p className="text-xs font-mono text-ink-soft mt-1 mb-5">Cognitive error frequency across your submissions.</p>
+                <div className="space-y-3.5">
+                  {bugDna.map((b, i) => (
+                    <div key={b.tag} className="grid grid-cols-[minmax(0,9.5rem)_1fr_2rem] sm:grid-cols-[13rem_1fr_2.5rem] items-center gap-3 text-xs font-mono">
+                      <span className="truncate text-ink font-semibold" title={`#${b.tag}`}>#{b.tag}</span>
+                      <div className="meter" aria-hidden="true">
+                        <span style={{ width: `${(b.count / maxDna) * 100}%`, background: dnaColors[i % dnaColors.length], animationDelay: `${i * 100}ms` }}></span>
+                      </div>
+                      <span className="text-right text-ink-soft">{b.count}×</span>
+                    </div>
+                  ))}
+                </div>
+              </PaperCard>
+            </Reveal>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Recurring Mistake DNA */}
+            <Reveal delay={180} className="h-full">
+              <PaperCard className="h-full">
+                <h3 className="font-serif text-xl font-bold text-ink mb-1">Recurring Mistake DNA</h3>
+                <p className="text-xs text-ink-soft font-mono mb-4">
+                  Patterns identified across multiple kata submissions.
+                </p>
+
+                <div className="space-y-3">
+                  {learner.recurring_mistakes.map((rm) => (
+                    <div key={rm.tag} className="dojo-inset p-4">
+                      <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                        <span className="pill pill-seal font-bold">#{rm.tag}</span>
+                        <span className="text-xs font-mono text-ink-soft">Seen in {rm.count} Katas</span>
+                      </div>
+                      <p className="text-sm text-ink">{rm.description}</p>
+                      <div className="mt-2 text-[11px] font-mono text-ink-soft">
+                        Occurred in: {rm.challenges.join(", ")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </PaperCard>
+            </Reveal>
+
+            {/* Earned Seals & Achievements */}
+            <Reveal delay={240} className="h-full">
+              <PaperCard className="h-full">
+                <h3 className="font-serif text-xl font-bold text-ink mb-1">Dojo Seals Awarded</h3>
+                <p className="text-xs text-ink-soft font-mono mb-4">
+                  Tokens of discipline and bug eradication.
+                </p>
+
+                <div className="flex flex-wrap gap-4">
+                  {learner.achievements.map((ach) => (
+                    <div key={ach} className="dojo-inset p-3 pr-5 flex items-center gap-3">
+                      <Seal char="印" size="md" />
+                      <div>
+                        <div className="font-serif text-sm font-bold text-ink">{ach}</div>
+                        <div className="text-[11px] font-mono text-pine font-medium">Verified</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </PaperCard>
+            </Reveal>
+          </div>
+        </div>
+      );
+    }
+
+    // 5. History Page (Route: /history)
+    function HistoryPage({ onNavigate }) {
+      const { learnerId } = useContext(DojoContext);
+      const [historyItems, setHistoryItems] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [reload, setReload] = useState(0);
+
+      useEffect(() => {
+        let alive = true;
+        async function load() {
+          setLoading(true);
+          setError(null);
+          try {
+            const data = await api.history(learnerId);
+            if (alive) setHistoryItems(Array.isArray(data) ? data : []);
+          } catch (e) {
+            if (alive) setError(e);
+          } finally {
+            if (alive) setLoading(false);
+          }
+        }
+        load();
+        return () => { alive = false; };
+      }, [learnerId, reload]);
+
+      if (loading) return <Loader label="Reviewing past kata logs..." />;
+      if (error) return <LoadError error={error} onNavigate={onNavigate} onRetry={() => setReload((n) => n + 1)} />;
+
+      return (
+        <div className="space-y-8">
+          <Reveal>
+            <RuleHeading
+              title="Attempt History"
+              subtitle="Chronicle of every evaluation, tests satisfied, and mistake tags detected."
+            />
+          </Reveal>
+
+          <div className="space-y-3">
+            {historyItems.map((item, i) => (
+              <Reveal key={item.submission_id} delay={i * 70}>
+                <PaperCard pad="p-4 md:p-5" className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4 min-w-0">
+                    <Seal char={item.all_passed ? "完" : "試"} size="md" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap">
+                        <span className="font-serif text-lg font-bold text-ink break-all">{item.challenge_id}</span>
+                        <span className="text-xs font-mono text-ink-soft">{item.created_at}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-xs font-mono flex-wrap">
+                        <span className="text-pine font-medium">{item.passed_count} passed</span>
+                        <span className="text-ink-soft">/</span>
+                        <span className={item.failed_count > 0 ? "text-seal font-medium" : "text-ink-soft"}>
+                          {item.failed_count} failed
+                        </span>
+                        <span className="text-ink-soft">• Hints used: {item.hints_used}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {item.mistake_tags.map(t => (
+                      <span key={t} className="pill pill-seal">#{t}</span>
+                    ))}
+                    <InkButton variant="secondary" onClick={() => onNavigate(`/challenge/${item.challenge_id}`)}>
+                      Review
+                    </InkButton>
+                  </div>
+                </PaperCard>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      // Routing state (routes: / (Dashboard), /welcome, /challenge/:id, /progress, /history)
+      const [currentRoute, setCurrentRoute] = useState("/");
+      // Night theme toggle state in memory (React state only)
+      const [isDark, setIsDark] = useState(false);
+      // Learner identity in React state
+      const [session, setSessionState] = useState(Session.current);
+      const [learnerId, setLearnerId] = useState(Session.current ? Session.current.learnerId : DEFAULT_LEARNER);
+      // Ambience (petal count / wind speed / cursor petals), remembered per browser
+      const [ambience, setAmbienceState] = useState(() => {
+        try {
+          const v = JSON.parse(localStorage.getItem(AMBIENCE_KEY) || "null");
+          return v ? { ...AMBIENCE_DEFAULT, ...v } : AMBIENCE_DEFAULT;
+        } catch (e) { return AMBIENCE_DEFAULT; }
+      });
+      const setAmbience = (next) => {
+        setAmbienceState(next);
+        try { localStorage.setItem(AMBIENCE_KEY, JSON.stringify(next)); } catch (e) {}
+      };
+      // Petal-wipe page transition animation active state
+      const [wiping, setWiping] = useState(false);
+
+      // Focus Mode State with localStorage persistence
+      const [focusMode, setFocusMode] = useState(() => {
+        try {
+          return localStorage.getItem("debugdojo_focus_mode") === "true";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      useEffect(() => {
+        try {
+          localStorage.setItem("debugdojo_focus_mode", String(focusMode));
+        } catch (e) {}
+      }, [focusMode]);
+
+      // Focus mode is active when on a challenge workbench and focusMode is enabled
+      const isWorkbench = currentRoute.startsWith("/challenge");
+      const isFocusActive = isWorkbench && focusMode;
+
+      const prefersReducedMotion = useMemo(() => {
+        return typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      }, []);
+
+      // Handle Page Navigation with a petal-wipe transition (pink sweep, ~380ms)
+      const handleNavigate = (route) => {
+        if (route === currentRoute) return;
+        if (prefersReducedMotion) {
+          setCurrentRoute(route);
+          window.scrollTo({ top: 0 });
+          return;
+        }
+        setWiping(true);
+        setTimeout(() => {
+          setCurrentRoute(route);
+          window.scrollTo({ top: 0 });
+        }, 175);
+        setTimeout(() => {
+          setWiping(false);
+        }, 390);
+      };
+
+      const toggleTheme = () => {
+        setIsDark(prev => !prev);
+      };
+
+      const signIn = (s) => { Session.save(s); setSessionState(s); setLearnerId(s.learnerId); };
+      const signOut = () => {
+        Session.clear();
+        setSessionState(null);
+        setLearnerId(DEFAULT_LEARNER);
+        handleNavigate("/welcome");
+      };
+
+      useScrollEffects();
+      useMouseEffects(!isFocusActive && !prefersReducedMotion);
+
+      // Apply dark class to the document root
+      useEffect(() => {
+        if (isDark) {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      }, [isDark]);
+
+      // Route Dispatcher
+      const renderCurrentRoute = () => {
+        if (currentRoute === "/") {
+          return <DashboardPage onNavigate={handleNavigate} />;
+        }
+        if (currentRoute === "/welcome") {
+          return <WelcomePage onNavigate={handleNavigate} />;
+        }
+        if (currentRoute.startsWith("/challenge")) {
+          const parts = currentRoute.split("/");
+          const challengeId = parts[2] || "last-k-total";
+          return <ChallengePage challengeId={challengeId} onNavigate={handleNavigate} />;
+        }
+        if (currentRoute === "/progress") {
+          return <ProgressPage onNavigate={handleNavigate} />;
+        }
+        if (currentRoute === "/history") {
+          return <HistoryPage onNavigate={handleNavigate} />;
+        }
+        return <DashboardPage onNavigate={handleNavigate} />;
+      };
+
+      return (
+        <DojoContext.Provider value={{ learnerId, setLearnerId, focusMode, setFocusMode, isFocusActive, session, signIn, signOut, ambience, setAmbience }}>
+          <div className={`min-h-screen text-ink ${isFocusActive ? "focus-viewport" : ""}`}>
+            <IntroSplash />
+            <ScrollProgress />
+            <CursorPetals enabled={ambience.trail && !isFocusActive && !prefersReducedMotion} />
+            <TeamCredit />
+
+            {/* Page-transition overlay */}
+            {wiping && !isFocusActive && <div className="petal-wipe" />}
+
+            {/* Atmosphere: blossoming branches + drifting petals (decorative, behind content) */}
+            {!isFocusActive && (
+              <>
+                <div className="branch-layer branch-right" aria-hidden="true"><div><SakuraBranch seed={11} idp="brR" /></div></div>
+                <div className="branch-layer branch-left" aria-hidden="true"><div><SakuraBranch seed={23} idp="brL" /></div></div>
+                <PetalLayer density={ambience.density} speed={ambience.speed} />
+              </>
+            )}
+
+            <div className={`relative z-10 ${isFocusActive ? "h-full flex flex-col" : ""}`}>
+              {!isFocusActive && <NavigationRail currentRoute={currentRoute} onNavigate={handleNavigate} />}
+              {!isFocusActive && <AppHeader isDark={isDark} onToggleTheme={toggleTheme} onNavigate={handleNavigate} />}
+
+              <main className={
+                isFocusActive
+                  ? "w-full h-screen p-2 md:p-3 flex flex-col overflow-hidden m-0 max-w-none"
+                  : "max-w-[72rem] mx-auto px-5 md:pl-28 md:pr-8 pt-8 md:pt-10 min-h-[calc(100vh-4rem)]"
+              }>
+                {/* key => each route enters with a soft rise-in and fresh state */}
+                <div key={currentRoute} className={`page-enter ${isFocusActive ? "h-full flex-1 flex flex-col min-h-0" : ""}`}>
+                  {renderCurrentRoute()}
+                </div>
+              </main>
+
+              {!isFocusActive && (
+                <>
+                  <ToriiScene />
+                  <footer className="text-center text-xs font-mono py-6 pb-28 md:pb-8" style={{ background: "var(--hill)", color: "rgb(255 240 244 / .75)" }}>
+                    Debug Dojo · 道場 · find the bug, keep the answer
+                  </footer>
+                </>
+              )}
+            </div>
+          </div>
+        </DojoContext.Provider>
+      );
+    }
+
+    // Render the React application
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "id": "remove-duplicates",
+  "title": "Remove Duplicates",
+  "difficulty": "medium",
+  "concepts": [
+    "lists",
+    "conditions"
+  ],
+  "description": "Returns a new list with duplicate items removed, preserving the original order of their first appearance. The original list must not be changed.",
+  "starter_code": "def remove_duplicates(items):\n    pass\n",
+  "function_name": "remove_duplicates",
+  "arg_names": [
+    "items"
+  ],
+  "targets_mistakes": [
+    "mutates_input",
+    "unhandled_short_input",
+    "off_by_one"
+  ],
+  "boundary_values": [
+    0,
+    1
+  ],
+  "sort_order": 7,
+  "short_input_categories": [
+    "empty_list",
+    "single_element"
+  ]
+}

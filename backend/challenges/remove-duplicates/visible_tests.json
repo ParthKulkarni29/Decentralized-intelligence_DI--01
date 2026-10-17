@@ -1,0 +1,17 @@
+[
+  {
+    "args": [[1, 2, 2, 3, 1, 4]],
+    "expected": [1, 2, 3, 4],
+    "category": "integers_with_duplicates"
+  },
+  {
+    "args": [["a", "b", "a", "c", "b"]],
+    "expected": ["a", "b", "c"],
+    "category": "strings_preserving_order"
+  },
+  {
+    "args": [[10, 20, 30]],
+    "expected": [10, 20, 30],
+    "category": "already_unique"
+  }
+]

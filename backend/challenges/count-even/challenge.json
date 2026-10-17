@@ -1,0 +1,29 @@
+{
+  "id": "count-even",
+  "title": "Count Even",
+  "difficulty": "medium",
+  "concepts": [
+    "loops",
+    "conditions"
+  ],
+  "description": "Returns the number of even integers in the numbers list. If numbers is empty, returns 0.",
+  "starter_code": "def count_even(numbers):\n    pass\n",
+  "function_name": "count_even",
+  "arg_names": [
+    "numbers"
+  ],
+  "targets_mistakes": [
+    "off_by_one",
+    "boundary_comparison",
+    "print_not_return"
+  ],
+  "boundary_values": [
+    0
+  ],
+  "sort_order": 6,
+  "short_input_categories": [
+    "empty_list",
+    "single_odd",
+    "single_zero_even"
+  ]
+}

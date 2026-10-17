@@ -1,0 +1,17 @@
+[
+  {
+    "args": [[10, 20, 30], 0],
+    "expected": 10,
+    "category": "normal_list"
+  },
+  {
+    "args": [[], -1],
+    "expected": -1,
+    "category": "empty_list_with_default"
+  },
+  {
+    "args": [["apple", "banana"], "none"],
+    "expected": "apple",
+    "category": "string_list"
+  }
+]

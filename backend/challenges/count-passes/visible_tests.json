@@ -1,0 +1,17 @@
+[
+  {
+    "args": [[30, 45, 50, 20]],
+    "expected": 2,
+    "category": "normal_mixed"
+  },
+  {
+    "args": [[10, 25, 39]],
+    "expected": 0,
+    "category": "all_failing"
+  },
+  {
+    "args": [[40, 60, 80]],
+    "expected": 3,
+    "category": "all_passing_with_boundary"
+  }
+]

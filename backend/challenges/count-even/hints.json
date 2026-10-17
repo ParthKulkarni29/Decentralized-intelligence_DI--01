@@ -1,0 +1,12 @@
+{
+  "boundary_comparison": [
+    "How does modular arithmetic determine whether an integer is divisible by two without any remainder?",
+    "The condition breaks on numbers like zero or negative values where the remainder check fails or uses the wrong comparison.",
+    "Check if dividing the number by two leaves a remainder of zero, and increment your count only when that condition holds."
+  ],
+  "generic": [
+    "How can an algorithm inspect every number in a collection and tally only those meeting a specific condition?",
+    "The counter produces an incorrect total if it starts from the wrong initial value or counts odd numbers.",
+    "Initialize a tally at zero, iterate through each item in the numbers collection, test for divisibility by two, and add one for each matching number."
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "first-n-squares",
+  "title": "First N Squares",
+  "difficulty": "easy",
+  "concepts": [
+    "loops",
+    "lists",
+    "edge_cases"
+  ],
+  "description": "Returns [1, 4, 9, ..., n*n], or [] when n is 0. n is an integer, 0 or more.",
+  "starter_code": "def first_n_squares(n):\n    pass\n",
+  "function_name": "first_n_squares",
+  "arg_names": [
+    "n"
+  ],
+  "targets_mistakes": [
+    "off_by_one",
+    "unhandled_short_input",
+    "print_not_return"
+  ],
+  "boundary_values": [
+    0,
+    1
+  ],
+  "sort_order": 3,
+  "short_input_categories": [
+    "n_zero",
+    "n_one",
+    "single_square"
+  ]
+}

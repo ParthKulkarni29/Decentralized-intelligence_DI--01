@@ -1,0 +1,22 @@
+{
+  "unhandled_short_input": [
+    "How should an extraction function respond when a list contains fewer items than the requested window size?",
+    "The logic crashes with an index error when given a list with zero, one, or two elements.",
+    "Check the size of the input list first, and return an empty list or the entire input if it contains fewer than three elements."
+  ],
+  "off_by_one": [
+    "In an odd-length sequence, how is the exact midpoint defined and how do neighbors flank it?",
+    "The window is shifted left or right, missing the true center or picking an asymmetric set of neighbors.",
+    "Find the center position using integer division by two, and extract a window spanning from one position before the center through one position after."
+  ],
+  "mutates_input": [
+    "Should inspecting a sequence alter the caller's original list of items?",
+    "Calling removal or truncation operations on the input modifies the caller's data in place.",
+    "Extract the middle elements using a non-destructive slice or new list creation so the original collection remains untouched."
+  ],
+  "generic": [
+    "How do you locate the center of a list and extract a balanced window around it?",
+    "Calculations fail when the list is too short or when integer division rounds the center index unexpectedly.",
+    "Verify that the list has at least three elements, calculate the center index, and slice the middle three elements into a new list."
+  ]
+}

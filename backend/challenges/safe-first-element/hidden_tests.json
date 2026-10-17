@@ -1,0 +1,32 @@
+[
+  {
+    "args": [[], null],
+    "expected": null,
+    "category": "empty_list_none_default"
+  },
+  {
+    "args": [[42], 0],
+    "expected": 42,
+    "category": "single_element_list"
+  },
+  {
+    "args": [[false, true], true],
+    "expected": false,
+    "category": "boolean_first_element_falsy"
+  },
+  {
+    "args": [[0, 1, 2], 99],
+    "expected": 0,
+    "category": "zero_first_element_falsy"
+  },
+  {
+    "args": [[], "fallback"],
+    "expected": "fallback",
+    "category": "empty_list_string_default"
+  },
+  {
+    "args": [[null, 1, 2], "default_val"],
+    "expected": null,
+    "category": "none_as_first_element"
+  }
+]

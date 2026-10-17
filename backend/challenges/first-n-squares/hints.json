@@ -1,0 +1,22 @@
+{
+  "off_by_one": [
+    "When counting the first positive integers, where does counting begin and where does it end?",
+    "The generated sequence starts at zero instead of one, or stops before reaching the square of the target number.",
+    "Generate numbers starting from one through the requested count inclusive, squaring each integer and collecting them into an ordered list."
+  ],
+  "unhandled_short_input": [
+    "What should a collection of the first positive integers look like when zero numbers are requested?",
+    "The function fails when given zero or negative input by generating unwanted numbers instead of an empty collection.",
+    "Immediately produce an empty list when the requested count is zero or negative."
+  ],
+  "print_not_return": [
+    "Does the caller receive the list as a result, or does it only appear in the terminal output?",
+    "The grader evaluates the return value as nothing because each square is printed rather than returned.",
+    "Accumulate the squared integers into a list and provide that completed list as the function return value."
+  ],
+  "generic": [
+    "How can an algorithm build a list containing square numbers for a specified count of terms?",
+    "The logic misbehaves on zero inputs or when the sequence range excludes the last desired number.",
+    "Iterate from one through the target number inclusive, calculate each square, store the values in sequence, and return the final list."
+  ]
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "args": [[10, 20, 30, 40], 3],
+    "expected": 90,
+    "category": "normal"
+  },
+  {
+    "args": [[100], 1],
+    "expected": 100,
+    "category": "single_element"
+  },
+  {
+    "args": [[2, 5], 5],
+    "expected": 7,
+    "category": "k_larger_than_list"
+  },
+  {
+    "args": [[1, 2, 3, 4], 4],
+    "expected": 10,
+    "category": "k_equal_to_length"
+  },
+  {
+    "args": [[], 3],
+    "expected": 0,
+    "category": "empty_list"
+  },
+  {
+    "args": [[10, 20, 30], 0],
+    "expected": 0,
+    "category": "k_zero"
+  },
+  {
+    "args": [[5, 10, 15, 20, 25], 4],
+    "expected": 70,
+    "category": "boundary_value"
+  }
+]

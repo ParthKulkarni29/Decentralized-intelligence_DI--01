@@ -1,0 +1,12 @@
+{
+  "mutates_input": [
+    "What does it mean for a function to be non-destructive towards its arguments?",
+    "Modifying or popping elements from the input list alters the caller's original data.",
+    "Construct a fresh list to store distinct elements, leaving the input sequence completely unmodified."
+  ],
+  "generic": [
+    "How can a program preserve the first appearance of each item while ignoring repeated occurrences?",
+    "Converting directly to an unordered collection loses the original sequence order.",
+    "Maintain a tracking set of previously encountered values, iterate through the input in order, and append each newly seen element to a results list."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "middle-three",
+  "title": "Middle Three",
+  "difficulty": "easy",
+  "concepts": [
+    "lists",
+    "indexing",
+    "edge_cases"
+  ],
+  "description": "Returns the middle three items as a list, or the whole list if it has fewer than 3 items. items is a list of odd length, or with fewer than 3 items.",
+  "starter_code": "def middle_three(items):\n    pass\n",
+  "function_name": "middle_three",
+  "arg_names": [
+    "items"
+  ],
+  "targets_mistakes": [
+    "unhandled_short_input",
+    "off_by_one",
+    "mutates_input"
+  ],
+  "boundary_values": [
+    3
+  ],
+  "sort_order": 4,
+  "short_input_categories": [
+    "empty_list",
+    "single_item",
+    "length_one",
+    "length_two",
+    "fewer_than_three"
+  ]
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "args": [[]],
+    "expected": {
+      "pass": [],
+      "fail": []
+    },
+    "category": "empty_list"
+  },
+  {
+    "args": [[40]],
+    "expected": {
+      "pass": [40],
+      "fail": []
+    },
+    "category": "single_exact_boundary_40"
+  },
+  {
+    "args": [[39]],
+    "expected": {
+      "pass": [],
+      "fail": [39]
+    },
+    "category": "single_just_below_boundary_39"
+  },
+  {
+    "args": [[39, 40, 41]],
+    "expected": {
+      "pass": [40, 41],
+      "fail": [39]
+    },
+    "category": "boundary_trio"
+  },
+  {
+    "args": [[40, 30, 40, 20, 80]],
+    "expected": {
+      "pass": [40, 40, 80],
+      "fail": [30, 20]
+    },
+    "category": "duplicate_boundary_values"
+  },
+  {
+    "args": [[0, 100, 39, 41]],
+    "expected": {
+      "pass": [100, 41],
+      "fail": [0, 39]
+    },
+    "category": "extreme_scores"
+  }
+]

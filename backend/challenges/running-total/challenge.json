@@ -1,0 +1,27 @@
+{
+  "id": "running-total",
+  "title": "Running Total",
+  "difficulty": "medium",
+  "concepts": [
+    "loops"
+  ],
+  "description": "Returns a new list where each element is the cumulative sum of numbers up to that index. If numbers is empty, returns []. The original list must not be changed.",
+  "starter_code": "def running_total(numbers):\n    pass\n",
+  "function_name": "running_total",
+  "arg_names": [
+    "numbers"
+  ],
+  "targets_mistakes": [
+    "mutates_input",
+    "off_by_one",
+    "unhandled_short_input"
+  ],
+  "boundary_values": [
+    0
+  ],
+  "sort_order": 8,
+  "short_input_categories": [
+    "empty_list",
+    "single_element"
+  ]
+}

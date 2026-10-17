@@ -1,0 +1,32 @@
+[
+  {
+    "args": [0],
+    "expected": [],
+    "category": "n_zero"
+  },
+  {
+    "args": [2],
+    "expected": [1, 4],
+    "category": "n_two"
+  },
+  {
+    "args": [5],
+    "expected": [1, 4, 9, 16, 25],
+    "category": "n_five"
+  },
+  {
+    "args": [6],
+    "expected": [1, 4, 9, 16, 25, 36],
+    "category": "n_six"
+  },
+  {
+    "args": [8],
+    "expected": [1, 4, 9, 16, 25, 36, 49, 64],
+    "category": "n_eight"
+  },
+  {
+    "args": [10],
+    "expected": [1, 4, 9, 16, 25, 36, 49, 64, 81, 100],
+    "category": "n_ten"
+  }
+]

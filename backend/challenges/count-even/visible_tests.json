@@ -1,0 +1,17 @@
+[
+  {
+    "args": [[1, 2, 3, 4, 5, 6]],
+    "expected": 3,
+    "category": "mixed_numbers"
+  },
+  {
+    "args": [[1, 3, 5, 7]],
+    "expected": 0,
+    "category": "all_odd"
+  },
+  {
+    "args": [[2, 4, 8, 10]],
+    "expected": 4,
+    "category": "all_even"
+  }
+]

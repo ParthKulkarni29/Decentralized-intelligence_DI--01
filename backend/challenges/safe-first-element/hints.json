@@ -1,0 +1,12 @@
+{
+  "unhandled_short_input": [
+    "What occurs when accessing an index in a collection that contains zero items?",
+    "Attempting to index the first position on an empty list raises an out-of-range error before any fallback can occur.",
+    "Check if the collection has any elements before accessing index zero; return the provided default value if the collection is empty."
+  ],
+  "generic": [
+    "How can a function safely guard against empty container access while returning a default value?",
+    "The code unconditionally retrieves the first item and crashes when given an empty list.",
+    "Test whether the input collection is non-empty; return the first element if present, otherwise return the fallback default value."
+  ]
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "args": [[10, 20, 30, 40], 2],
+    "expected": 70,
+    "category": "normal"
+  },
+  {
+    "args": [[5, 15, 25], 1],
+    "expected": 25,
+    "category": "single_last"
+  },
+  {
+    "args": [[1, 2, 3], 3],
+    "expected": 6,
+    "category": "all_elements"
+  }
+]

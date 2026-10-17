@@ -1,0 +1,22 @@
+{
+  "boundary_comparison": [
+    "Are scores that equal the exact passing threshold considered passing marks?",
+    "The logic fails when a student scores exactly forty because a strict greater-than check ignores boundary scores.",
+    "Use an inclusive comparison so that marks equal to or exceeding the passing threshold are counted."
+  ],
+  "off_by_one": [
+    "How should a counter initialize and advance as it iterates over matching elements?",
+    "The count is off by one if the accumulator begins at a non-zero value or counts before verifying the score.",
+    "Start an accumulator at zero, evaluate each mark against the pass threshold, and increment the accumulator once per qualifying student."
+  ],
+  "print_not_return": [
+    "What is the difference between sending a value back to a caller and printing it to the console?",
+    "The test runner receives no result because writing text to the terminal leaves the function returning nothing.",
+    "Pass the final integer count back to the caller using a return statement instead of printing to the terminal."
+  ],
+  "generic": [
+    "How does a program systematically evaluate student grades against a required threshold?",
+    "The logic fails on empty lists or when scores land right on the passing boundary.",
+    "Traverse the sequence of marks, test whether each score meets the passing cutoff, and return the accumulated count."
+  ]
+}

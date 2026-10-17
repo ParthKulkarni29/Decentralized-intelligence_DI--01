@@ -1,0 +1,17 @@
+[
+  {
+    "args": [3],
+    "expected": [1, 4, 9],
+    "category": "small_n"
+  },
+  {
+    "args": [1],
+    "expected": [1],
+    "category": "single_square"
+  },
+  {
+    "args": [4],
+    "expected": [1, 4, 9, 16],
+    "category": "four_squares"
+  }
+]

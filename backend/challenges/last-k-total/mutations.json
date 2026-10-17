@@ -1,0 +1,12 @@
+{
+  "mutated_code": "def last_k_total(marks, k):\n    return sum(marks[-k:])\n",
+  "question": "What will happen if we call last_k_total([10, 20], 0)?",
+  "options": [
+    {"id": "A", "text": "It returns 0 as expected"},
+    {"id": "B", "text": "It returns 30 (the sum of the entire list)"},
+    {"id": "C", "text": "It raises an IndexError"},
+    {"id": "D", "text": "It returns None"}
+  ],
+  "correct_id": "B",
+  "explanation": "In Python, -0 evaluates to 0, so marks[-0:] becomes marks[0:]. This slices from the beginning of the list to the end, resulting in the sum of all elements (30) instead of 0."
+}

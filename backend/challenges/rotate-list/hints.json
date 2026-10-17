@@ -1,0 +1,12 @@
+{
+  "off_by_one": [
+    "When shifting items from the back of a list to the front, which elements move and which stay?",
+    "The split point takes one element too many or too few, altering the rotation boundary.",
+    "Divide the sequence into the tail segment that shifts forward and the head segment that shifts back, then concatenate them in rotated order."
+  ],
+  "generic": [
+    "What happens when a rotation amount is larger than the length of the list itself?",
+    "A rotation count greater than the list size causes index errors or full wraparound miscalculations.",
+    "Calculate the effective rotation by taking the rotation count modulo the list length, then slice and reassemble the two halves."
+  ]
+}

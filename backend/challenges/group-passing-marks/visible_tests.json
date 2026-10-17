@@ -1,0 +1,26 @@
+[
+  {
+    "args": [[35, 40, 75, 20]],
+    "expected": {
+      "pass": [40, 75],
+      "fail": [35, 20]
+    },
+    "category": "mixed_scores_with_boundary"
+  },
+  {
+    "args": [[50, 60, 90]],
+    "expected": {
+      "pass": [50, 60, 90],
+      "fail": []
+    },
+    "category": "all_passing"
+  },
+  {
+    "args": [[10, 25, 39]],
+    "expected": {
+      "pass": [],
+      "fail": [10, 25, 39]
+    },
+    "category": "all_failing"
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "id": "group-passing-marks",
+  "title": "Group Passing Marks",
+  "difficulty": "hard",
+  "concepts": [
+    "conditions",
+    "lists"
+  ],
+  "description": "Groups marks into passing (40 or more) and failing (under 40) categories. Returns a dictionary {'pass': [...], 'fail': [...]} preserving original order. If marks is empty, returns {'pass': [], 'fail': []}.",
+  "starter_code": "def group_passing_marks(marks):\n    pass\n",
+  "function_name": "group_passing_marks",
+  "arg_names": [
+    "marks"
+  ],
+  "targets_mistakes": [
+    "boundary_comparison",
+    "off_by_one",
+    "unhandled_short_input"
+  ],
+  "boundary_values": [
+    40
+  ],
+  "sort_order": 10,
+  "short_input_categories": [
+    "empty_list",
+    "single_element"
+  ]
+}

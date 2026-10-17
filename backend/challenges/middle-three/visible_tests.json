@@ -1,0 +1,17 @@
+[
+  {
+    "args": [[1, 2, 3, 4, 5]],
+    "expected": [2, 3, 4],
+    "category": "length_five"
+  },
+  {
+    "args": [[10, 20, 30]],
+    "expected": [10, 20, 30],
+    "category": "exact_length_three"
+  },
+  {
+    "args": [[42]],
+    "expected": [42],
+    "category": "single_item"
+  }
+]

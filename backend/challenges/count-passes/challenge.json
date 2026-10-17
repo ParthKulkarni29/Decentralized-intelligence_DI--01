@@ -1,0 +1,29 @@
+{
+  "id": "count-passes",
+  "title": "Count Passes",
+  "difficulty": "easy",
+  "concepts": [
+    "conditions",
+    "loops",
+    "lists"
+  ],
+  "description": "Returns how many marks are 40 or more. If marks is empty, returns 0.",
+  "starter_code": "def count_passes(marks):\n    pass\n",
+  "function_name": "count_passes",
+  "arg_names": [
+    "marks"
+  ],
+  "targets_mistakes": [
+    "boundary_comparison",
+    "off_by_one",
+    "print_not_return"
+  ],
+  "boundary_values": [
+    40
+  ],
+  "sort_order": 2,
+  "short_input_categories": [
+    "empty_list",
+    "single_element"
+  ]
+}

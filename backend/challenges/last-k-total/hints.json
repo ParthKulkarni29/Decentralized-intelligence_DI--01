@@ -1,0 +1,22 @@
+{
+  "unhandled_short_input": [
+    "What should happen when the requested window is larger than the entire list?",
+    "When the requested count exceeds the list length, computing a negative starting offset wraps around and adds items multiple times.",
+    "Ensure the starting position never drops below zero by taking the entire list when the requested count exceeds available items."
+  ],
+  "off_by_one": [
+    "How many items should be included in a total from the tail of a sequence?",
+    "The slice or loop selects one element too few or one element too many from the end of the collection.",
+    "Determine the starting boundary from the right-hand side using the requested count and sum exactly those tail elements."
+  ],
+  "print_not_return": [
+    "How does a caller obtain the calculated total from a function?",
+    "The function calculates the correct sum but displays it to the screen instead of returning it to the program.",
+    "Return the resulting sum integer directly to the caller rather than writing it to standard output."
+  ],
+  "generic": [
+    "How can a program safely extract and sum a subset of numbers from the end of a list?",
+    "The logic miscalculates when the list is empty, when the count is zero, or when the count is larger than the list.",
+    "Handle boundary inputs where the count is zero or the list is empty, isolate the tail segment, and sum the elements."
+  ]
+}

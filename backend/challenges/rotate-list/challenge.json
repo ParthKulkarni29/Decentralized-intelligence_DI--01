@@ -1,0 +1,32 @@
+{
+  "id": "rotate-list",
+  "title": "Rotate List",
+  "difficulty": "hard",
+  "concepts": [
+    "indexing",
+    "lists"
+  ],
+  "description": "Rotates a list to the right by k steps. Elements shifted off the end wrap around to the front. If items is empty or k is 0, returns a copy of items. k is an integer >= 0. The original list must not be changed.",
+  "starter_code": "def rotate_list(items, k):\n    pass\n",
+  "function_name": "rotate_list",
+  "arg_names": [
+    "items",
+    "k"
+  ],
+  "targets_mistakes": [
+    "off_by_one",
+    "unhandled_short_input",
+    "mutates_input"
+  ],
+  "boundary_values": [
+    0
+  ],
+  "sort_order": 9,
+  "short_input_categories": [
+    "empty_list",
+    "single_element_large_k",
+    "zero_steps",
+    "single_step_rotation",
+    "k_larger_than_length"
+  ]
+}
